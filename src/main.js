@@ -2,9 +2,9 @@ alert("tikrit begins");
 
 // ---------- LEGEND ----------
 
-// . => air block
-// @ => player (white)
-// X => solid wall indoor outdoor (grey)
+// . => floor tiles
+// @ => player (white), when dodge rolling become light gray
+// X => solid wall indoor outdoor (yellow, dark gray or brown)
 // [#, ¥] => trees (dark green)
 // [~, ] => water
 // = => bridge over gap or spikes or water (brown)
@@ -22,7 +22,7 @@ alert("tikrit begins");
 // S => enemy sniper
 // B => enemy bomber
 
-// !! DONT RENDER AIR BLOCK IN ACTUAL RENDER ENGINE !!
+// !! DONT RENDER AIR BLOCK IN ACTUAL RENDER ENGINE (?) !!
 
 // ---------- CANVAS ----------
 
@@ -40,15 +40,9 @@ c1.height = 700;
 
 console.log(c1);
 const c = c1.getContext("2d");
+c.font = "20px 'Comic Sans MS', cursive";
 
 // ---------- PREP WORK ----------
-
-const keys = {
-  w: false,
-  a: false,
-  s: false,
-  d: false,
-};
 
 // FUA add each rendering model to a dictionary
 
@@ -56,10 +50,90 @@ const keys = {
 
 // ----- ENTITIES ----- 
 
+var entity = {
+  player: {
+    size: 20,
+    coord: {
+      x:0,
+      y:0
+    },
+    speed: 20,
+    health: 10,
+    items: {
+
+    },
+    weight: 0, // calculated based on number of items, affects speed proportionally FUA add function to calculate speed
+    currently_dodge_rolling: false
+  }
+
+}
+
 // ---------- ACTUAL CODE ------------
 
 // ---------- USER INPUT ----------
 
+// movement => "wasd"
+// dodge roll one square in that direction; you are invincible during the roll like in dead cells => 'shift' + "wasd"
+// close door => 'c'
+// use item => 'u'
+// drop item => 'd'
+// throw item => 't'
+// pause game => 'space'
+// quit game and save => 'Q'
+
+// FUA might have to debug this further
+document.addEventListener('keydown', function(event) {
+  if (['w', 'a', 's', 'd', 'W', 'A', 'S', 'D', 'c', 'u', 'd', 't', 'Q', ' '].includes(event.key) || event.key === 'Spacebar') {
+    console.log(event.keycode);
+    switch (event.key) {
+      case 'w':
+        entity.player.coord.y = Math.max(0, entity.player.coord.y - entity.player.speed);
+        break;
+      case 'a':
+        entity.player.coord.x = Math.max(0, entity.player.coord.x - entity.player.speed);
+        break;
+      case 's':
+        entity.player.coord.y = Math.min(c1.height - entity.player.size, entity.player.coord.y + entity.player.speed);
+        break;
+      case 'd':
+        entity.player.coord.x = Math.min(c1.width - entity.player.size, entity.player.coord.x + entity.player.speed);
+        break;
+      // FUA ADD ACTIONS FOR OTHER THINGS AS BELOW
+      case 'W':
+        break;
+      case 'A':
+        break;
+      case 'S':
+        break;
+      case 'D':
+        break;
+      case 'c':
+        break;
+      case 'u':
+        break;
+      case 'd':
+        break;
+      case 't':
+        break;
+      case 'Q':
+        break;
+      case ' ':
+        break;
+      default:
+        if (event.key === 'Spacebar') {
+          // FUA add something here also
+        } else {
+          console.log(`Invalid input detected. Keypress was ${event.key}`)
+        }
+    }
+  }
+});
+
 // ---------- EVENT LOOP ----------
-c.font = "20px 'Comic Sans MS', cursive";
-c.fillText("@",10,30);
+function eventLoop() {
+  c.clearRect(0, 0, c1.width, c1.height);
+  c.fillText("@", entity.player.coord.x, entity.player.coord.y + entity.player.size);
+  requestAnimationFrame(eventLoop);
+}
+
+requestAnimationFrame(eventLoop);
