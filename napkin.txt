@@ -7,6 +7,7 @@
 
 ~ FUA
 * immediate
+    * create a function that checks whether an entity's coordinates are within bounds and returns a boolean
     * create a function that takes in a (0,0) coordinate and returns the equivalent pixel coordinate to draw the text to in canvas (eg. (0,0) becomes (20,20))
     * add color to the screen for ascii characters
     * tweak user input and player controls

@@ -24,6 +24,12 @@ alert("tikrit begins");
 
 // !! DONT RENDER AIR BLOCK IN ACTUAL RENDER ENGINE (?) !!
 
+// ---------- UTIL FUNCTIONS ----------
+
+function checkBounds(entity) {
+  return entity.player.coord.x < 0 || entity.player.coord.y < 0 || entity.player.coord.y > c1.height - entity.player.size || entity.player.coord.x > c1.width - entity.player.size;
+}
+
 // ---------- CANVAS ----------
 
 // instantiating canvas
@@ -87,16 +93,28 @@ document.addEventListener('keydown', function(event) {
     console.log(event.keycode);
     switch (event.key) {
       case 'w':
-        entity.player.coord.y = Math.max(0, entity.player.coord.y - entity.player.speed);
+        entity.player.coord.y -= entity.player.speed;
+        if (checkBounds(entity)) {
+          entity.player.coord.y += entity.player.speed;
+        } else {}
         break;
       case 'a':
-        entity.player.coord.x = Math.max(0, entity.player.coord.x - entity.player.speed);
+        entity.player.coord.x -= entity.player.speed;
+        if (checkBounds(entity)) {
+          entity.player.coord.x += entity.player.speed;
+        } else {}
         break;
       case 's':
-        entity.player.coord.y = Math.min(c1.height - entity.player.size, entity.player.coord.y + entity.player.speed);
+        entity.player.coord.y += entity.player.speed;
+        if (checkBounds(entity)) {
+          entity.player.coord.y -= entity.player.speed;
+        } else {}
         break;
       case 'd':
-        entity.player.coord.x = Math.min(c1.width - entity.player.size, entity.player.coord.x + entity.player.speed);
+        entity.player.coord.x += entity.player.speed;
+        if (checkBounds(entity)) {
+          entity.player.coord.x -= entity.player.speed;
+        } else {}
         break;
       // FUA ADD ACTIONS FOR OTHER THINGS AS BELOW
       case 'W':
