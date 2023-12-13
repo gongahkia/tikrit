@@ -1,7 +1,19 @@
-canvas {
-    border: 1px solid black;
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
 }
 
-body {
-    margin: 0;
+#canvas-div {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+#c1 {
+    width: 700px;
+    height: 700px;
+    border: 3px solid #000;
+    border-radius: 15px;
 }

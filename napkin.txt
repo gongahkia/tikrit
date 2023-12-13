@@ -7,6 +7,15 @@
 
 ~ FUA
 * work out legend for ascii characters to be displayed
+* add color to the screen
+* copy the controls of hauberk repo
+* create global dictionary from scratch and figure out how to render stuff from the beginning
+* what different items do i want?
+* rendering system
+* framework for project
+* handle user input
+* add coordinate data below the screen
+* add collision to ensure the entitites cannot be rendered below the screen
 * clean up main.js
 * work out building objects and light rendering diffused
 * work out entity rendering system first
@@ -17,6 +26,7 @@
 * write a UI that initialises with player health, movement, charters corners of the game screen using these character codes from 185 to 188 and 200 to 205 https://theasciicode.com.ar/extended-ascii-code/box-drawings-double-vertical-line-character-ascii-code-186.html
     * player entity character creation
     * menu and settings screen
+    * show enemy health as a sidebar similar to hauberk on the right side of the screen
 * mutliple-dungeon style that is procedurally generated
     * 1st legend of zelda game-like dungeon crawler, where each terminal screen reflects a whole dungeon
     * shroud dungeon in darkness till player grabs a torch and moves around
@@ -32,12 +42,12 @@
 * procedural generation for terrain to text file 
     * wave function collapse?
     * destructable environments, all systems can affect other systems
-* work out how to resize canvas when window size changes
 * render all player information separately as text as well
 * add world clock that moves even if player is not moving
 * use bash scripting to check if node is installed and run the relevant commands && add makefile
 * make this accesible via a browser extension
 * separate JS files into engine defaults, unit tests and actual game
+* work out how to resize canvas when window size changes
 
 ~ ideas bucket
 * horror game
