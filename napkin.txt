@@ -7,47 +7,54 @@
 
 ~ FUA
 * immediate
-    * create a function that checks whether an entity's coordinates are within bounds and returns a boolean
-    * create a function that takes in a (0,0) coordinate and returns the equivalent pixel coordinate to draw the text to in canvas (eg. (0,0) becomes (20,20))
-    * add color to the screen for ascii characters
-    * tweak user input and player controls
-    * create global dictionary from scratch and figure out how to render stuff from the beginning
-    * work out entity rendering system first
-    * add world clock today that runs regardless of whether player is moving or not
+    * learn C#
+    * learn 2d game dev in godot using C#
 
-* unsorted
-    * unique player input (reload gun/pick lock), monitor input of mouse when pressing and holding
-    * save global data (all world generation terrain, item states, player and enemy states) locally saved to txt files (map) or JSON (player and other global information) on client device upon first playthrough so data can be reloaded on subsequent playthroughs
-    * read a stored text file to display the level layout
-    * after completing base game, can add in option to import and draw in sprites from itch.io, ensure size of each sprite is correct and proportional to ascii characters
-    * add mining and breaking of blocks to the game
-    * use cellular automata rules / wfc to generate ores and their spawn rates within stone => add additional legends for these ores
+* main ideas
+    * make it to be like JDH's minicraft with all the same defaults 
+    * room-based dungeon crawler?
+
     * skill-tree like level up system
         * scaled difficulty
         * randomly generated quests
+
     * write a UI that initialises with player health, movement, charters corners of the game screen using these character codes from 185 to 188 and 200 to 205 https://theasciicode.com.ar/extended-ascii-code/box-drawings-double-vertical-line-character-ascii-code-186.html
         * player entity character creation
         * menu and settings screen
         * show enemy health as a sidebar similar to hauberk on the right side of the screen
         * render all player information separately as text as well
         * add visible inventory UI similar to minecraft / minicraft, add button that allows for placing of blocks
+
     * add sound for certain actions
+
     * mutliple-dungeon style that is procedurally generated
         * 1st legend of zelda game-like dungeon crawler, where each terminal screen reflects a whole dungeon
         * shroud dungeon in darkness till player grabs a torch and moves around
+        
     * bossfight
         * minimal rhythm-based bullet-hell game 
         * movement grid-based
         * player on a small platform that fragments as boss sends shockwaves
-    * port over to all browsers (chrome, firefox, vivaldi, opera, edge)
-    * make this accesible via a browser extension
-    * separate JS files into engine defaults, unit tests and actual game
-    * work out how to resize canvas when window size changes
 
-* horror
-    * work out building objects and light rendering diffused, vision cones
     * multiplayer(?) => proximity chat
-    * implement unnerving sound design
+
+    * horror
+        * work out building objects and light rendering diffused, vision cones
+        * implement unnerving sound design
+
+* unsorted
+    * tweak user input and player controls
+    * add makefile and install.sh to install game
+    * add installation instructions
+    * add world clock today that runs regardless of whether player is moving
+    * somehow log current room player is in so i know which room i need to actively check for updates at a given time
+    * create global dictionary from scratch and figure out how to render stuff from the beginning
+    * save global data (all world generation terrain, item states, player and enemy states) locally saved to txt files (map) or JSON (player and other global information) on client device upon first playthrough so data can be reloaded on subsequent playthroughs
+    * unique player input (reload gun/pick lock), monitor input of mouse when pressing and holding
+    * read a stored text file to display the level layout
+    * after completing base game, can add in option to import and draw in sprites from itch.io, ensure size of each sprite is correct and proportional to ascii characters
+    * add mining and breaking of blocks to the game
+    * use cellular automata rules / wfc to generate ores and their spawn rates within stone => add additional legends for these ores
 
 * enemy path-finding AI
     * monster chases player until player out of sight and sound cones respectively
@@ -61,3 +68,4 @@
 ~ ideas bucket
 * inspiration
     * https://github.com/munificent/hauberk
+    * https://github.com/jdah/microcraft
