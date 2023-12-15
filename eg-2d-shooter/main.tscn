@@ -4,7 +4,7 @@
 [ext_resource path="res://sprite/reaper.png" type="Texture" id=2]
 
 [sub_resource type="RectangleShape2D" id=1]
-extents = Vector2( 243.89, 338.683 )
+extents = Vector2( 233.939, 233.734 )
 
 [node name="Node2D" type="Node2D"]
 
@@ -13,16 +13,13 @@ extents = Vector2( 243.89, 338.683 )
 [node name="wall" type="Area2D" parent="."]
 position = Vector2( -2685, -1416 )
 scale = Vector2( 1.00014, 0.919429 )
-__meta__ = {
-"_edit_group_": true
-}
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="wall"]
-position = Vector2( 3090.57, 1854.41 )
+position = Vector2( 3196.55, 1927.09 )
 scale = Vector2( 0.696666, 0.692506 )
 shape = SubResource( 1 )
 
 [node name="Sprite" type="Sprite" parent="wall"]
-position = Vector2( 3097.57, 1871.81 )
-scale = Vector2( 0.629803, 0.687763 )
+position = Vector2( 3185.55, 1940.33 )
+scale = Vector2( 0.60816, 0.396222 )
 texture = ExtResource( 2 )
