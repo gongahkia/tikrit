@@ -7,11 +7,14 @@
 
 ~ FUA
 * immediate
-    * learn C#
-    * learn 2d game dev in godot using C#
+    * create function to print out colored char
+    * create function to accept user input
+    * create a function to read local text file which shows the map of the current room 
+    * create a function to read a local json file that saves player information
+    * create basic player objects
 
 * main ideas
-    * make it to be like JDH's minicraft with all the same defaults 
+    * make it to be like JDH's minicraft with all the same defaults except no scrolling camera
     * room-based dungeon crawler?
 
     * skill-tree like level up system
