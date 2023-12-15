@@ -41,6 +41,7 @@
     * horror
         * work out building objects and light rendering diffused, vision cones
         * implement unnerving sound design
+        * unqiue player controls and movement mechanics 
 
 * unsorted
     * tweak user input and player controls
