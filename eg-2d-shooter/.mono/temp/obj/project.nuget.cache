@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "hIriiSivheEPdV0g3I5j0AdYUnIlB+u8Chtb4VPAhcplSffLlTmE1pUA/l4LDvwO7WvPRb4rkDK+0h6NLHOGfQ==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\gong\\Desktop\\Coding\\Projects\\tikrit\\eg-2d-shooter\\learn.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\gong\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.3\\microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
+    "C:\\Users\\gong\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net472\\1.0.3\\microsoft.netframework.referenceassemblies.net472.1.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

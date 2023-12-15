@@ -1,0 +1,10 @@
+C:\Users\gong\Desktop\Coding\Projects\tikrit\eg-2d-shooter\.mono\temp\bin\Debug\learn.dll
+C:\Users\gong\Desktop\Coding\Projects\tikrit\eg-2d-shooter\.mono\temp\bin\Debug\learn.pdb
+C:\Users\gong\Desktop\Coding\Projects\tikrit\eg-2d-shooter\.mono\temp\obj\Debug\learn.csproj.AssemblyReference.cache
+C:\Users\gong\Desktop\Coding\Projects\tikrit\eg-2d-shooter\.mono\temp\obj\Debug\learn.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\gong\Desktop\Coding\Projects\tikrit\eg-2d-shooter\.mono\temp\obj\Debug\learn.AssemblyInfoInputs.cache
+C:\Users\gong\Desktop\Coding\Projects\tikrit\eg-2d-shooter\.mono\temp\obj\Debug\learn.AssemblyInfo.cs
+C:\Users\gong\Desktop\Coding\Projects\tikrit\eg-2d-shooter\.mono\temp\obj\Debug\learn.csproj.CoreCompileInputs.cache
+C:\Users\gong\Desktop\Coding\Projects\tikrit\eg-2d-shooter\.mono\temp\obj\Debug\learn.sourcelink.json
+C:\Users\gong\Desktop\Coding\Projects\tikrit\eg-2d-shooter\.mono\temp\obj\Debug\learn.dll
+C:\Users\gong\Desktop\Coding\Projects\tikrit\eg-2d-shooter\.mono\temp\obj\Debug\learn.pdb
