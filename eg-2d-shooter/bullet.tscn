@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=2]
+
+[ext_resource path="res://bullet.cs" type="Script" id=1]
+[ext_resource path="res://sprite/ban.png" type="Texture" id=2]
+
+[sub_resource type="CanvasItemMaterial" id=2]
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 71.7516, 30.1542 )
+
+[node name="bullet" type="Node2D"]
+rotation = -6.28319
+script = ExtResource( 1 )
+
+[node name="Sprite" type="Sprite" parent="."]
+modulate = Color( 0.654902, 0.486275, 0.486275, 1 )
+light_mask = 257
+material = SubResource( 2 )
+position = Vector2( -63.581, 13.3491 )
+scale = Vector2( 0.0661834, 0.0820273 )
+texture = ExtResource( 2 )
+
+[node name="Area2D" type="Area2D" parent="."]
+position = Vector2( 23, 79 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+position = Vector2( -1.23978e-05, -0.999996 )
+shape = SubResource( 1 )
