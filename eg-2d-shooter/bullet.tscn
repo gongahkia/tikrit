@@ -6,7 +6,7 @@
 [sub_resource type="CanvasItemMaterial" id=2]
 
 [sub_resource type="RectangleShape2D" id=1]
-extents = Vector2( 71.7516, 30.1542 )
+extents = Vector2( 18.3758, 11.0772 )
 
 [node name="bullet" type="Node2D"]
 rotation = -6.28319
@@ -16,13 +16,13 @@ script = ExtResource( 1 )
 modulate = Color( 0.654902, 0.486275, 0.486275, 1 )
 light_mask = 257
 material = SubResource( 2 )
-position = Vector2( -63.581, 13.3491 )
-scale = Vector2( 0.0661834, 0.0820273 )
+position = Vector2( 36.9998, 36.0002 )
+scale = Vector2( 0.0208134, 0.0202102 )
 texture = ExtResource( 2 )
 
 [node name="Area2D" type="Area2D" parent="."]
 position = Vector2( 23, 79 )
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
-position = Vector2( -1.23978e-05, -0.999996 )
+position = Vector2( 13.9998, -42.9998 )
 shape = SubResource( 1 )

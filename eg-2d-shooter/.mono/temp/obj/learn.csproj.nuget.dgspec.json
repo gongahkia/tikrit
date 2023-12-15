@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\gong\\Desktop\\Coding\\Projects\\tikrit\\eg-2d-shooter\\learn.csproj": {}
+    "C:\\Users\\gong\\Desktop\\coding\\projects\\tikrit\\eg-2d-shooter\\learn.csproj": {}
   },
   "projects": {
-    "C:\\Users\\gong\\Desktop\\Coding\\Projects\\tikrit\\eg-2d-shooter\\learn.csproj": {
+    "C:\\Users\\gong\\Desktop\\coding\\projects\\tikrit\\eg-2d-shooter\\learn.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\gong\\Desktop\\Coding\\Projects\\tikrit\\eg-2d-shooter\\learn.csproj",
+        "projectUniqueName": "C:\\Users\\gong\\Desktop\\coding\\projects\\tikrit\\eg-2d-shooter\\learn.csproj",
         "projectName": "learn",
-        "projectPath": "C:\\Users\\gong\\Desktop\\Coding\\Projects\\tikrit\\eg-2d-shooter\\learn.csproj",
+        "projectPath": "C:\\Users\\gong\\Desktop\\coding\\projects\\tikrit\\eg-2d-shooter\\learn.csproj",
         "packagesPath": "C:\\Users\\gong\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\gong\\Desktop\\Coding\\Projects\\tikrit\\eg-2d-shooter\\.mono\\temp\\obj\\",
+        "outputPath": "C:\\Users\\gong\\Desktop\\coding\\projects\\tikrit\\eg-2d-shooter\\.mono\\temp\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\gong\\AppData\\Roaming\\NuGet\\NuGet.Config"

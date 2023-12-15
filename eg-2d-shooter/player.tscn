@@ -6,8 +6,8 @@
 [node name="player" type="Node2D"]
 script = ExtResource( 2 )
 
-[node name="piktur" type="Sprite" parent="."]
-position = Vector2( 1.99994, -8.00006 )
+[node name="Sprite" type="Sprite" parent="."]
+position = Vector2( -0.999999, -6 )
 rotation = 1.5708
-scale = Vector2( 0.131458, 0.131995 )
+scale = Vector2( 0.0466667, 0.0539984 )
 texture = ExtResource( 1 )

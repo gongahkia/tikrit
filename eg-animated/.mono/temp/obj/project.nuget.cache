@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "oEo4FRxXUU7Rzir4/laT4XteKnm9IPBgGRE00J0dACnE7hlATgASv42D9/mRTySLSPAXEYJEvuR/OL2wdOYgQA==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\gong\\Desktop\\coding\\projects\\tikrit\\eg-animated\\Eg-animated.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\gong\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.3\\microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
+    "C:\\Users\\gong\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net472\\1.0.3\\microsoft.netframework.referenceassemblies.net472.1.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}
