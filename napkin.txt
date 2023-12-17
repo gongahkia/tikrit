@@ -7,8 +7,8 @@
 
 ~ FUA
 * immediate
-    * learn 2d game dev in godot using C#
-    * learn C#
+    * try out raylib in C 
+    * try out raylib in PHP
 
 * main ideas
     * make it to be like JDH's minicraft with all the same defaults 
