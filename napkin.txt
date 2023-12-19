@@ -11,7 +11,7 @@
     * write some header files that implement reduce and map and other F# functions in my library
     * use bash to check if make and g++ or gcc or clangd installed
     * create make files to handle project installation and cleanup
-    * add installation instructions for raylib ()
+    * work in sprites later
 
 * main ideas
     * make it to be like JDH's minicraft with all the same defaults 
