@@ -7,12 +7,16 @@
 
 ~ FUA
 * immediate
-    * try out raylib in C 
-    * try out raylib in PHP
+    * continue learning how to use raylib in C
+    * write some header files that implement reduce and map and other F# functions in my library
+    * use bash to check if make and g++ or gcc or clangd installed
+    * create make files to handle project installation and cleanup
+    * add installation instructions for raylib ()
 
 * main ideas
     * make it to be like JDH's minicraft with all the same defaults 
     * room-based dungeon crawler?
+    * compile to WASM for web games
 
     * skill-tree like level up system
         * scaled difficulty
