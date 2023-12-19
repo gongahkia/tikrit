@@ -18,11 +18,11 @@ echo "
 
 # ---------- defaults ----------
 
-if command -v gcc &> /dev/null; then
-    echo "gcc already installed"
+if command -v lua &> /dev/null; then
+    echo "lua already installed"
 else
-    echo "installing gcc..."
-    sudo apt install gcc
+    echo "installing lua..."
+    sudo apt install lua5.4
 fi
 
 if command -v make &> /dev/null; then
@@ -32,32 +32,21 @@ else
     sudo apt install make  
 fi
 
-# ---------- install raylib ----------
-
-echo "checking raylib installation"
-echo "creating test program for compilation..."
-echo -e '#include <raylib.h>\nint main() { InitWindow(800, 600, "Raylib Test"); while (!WindowShouldClose()) {} CloseWindow(); return 0; }' > test/test.c
-gcc -o test/test test/test.c -lraylib -ldl -lpthread -lm -lX11 || {
-    echo "installing raylib..."
-    sudo apt install libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev    
-    cd ~
-    git clone https://github.com/raysan5/raylib.git raylib
-    cd raylib/src/
-    make PLATFORM=PLATFORM_DESKTOP
-    make clean
-    sudo make install
-    echo "raylib installed"
-    gcc -o test/test test/test.c -lraylib -ldl -lpthread -lm -lX11
-}
-if [ $? -eq 0 ]; then
-    echo "raylib compilation succesful"
-    rm test/test.c test/test
+if command -v love &> /dev/null; then
+    echo "love2d already installed"
 else
-    echo "raylib compilation failed"
-    echo "please check your raylib installation"
-    rm test/test.c test/test
+    echo "installing love2d..."
+    sudo add-apt-repository ppa:bartbes/love-stable
+    sudo apt update
+    sudo apt install love
 fi
+
+echo "testing love2d installation"
+echo -e 'function love.draw()\n\tlove.graphics.print("Your installation is functioning if you can see this!", 200, 200)\nend' >> test/main.lua
+love test
+echo "love2d installation validated"
+rm test/main.lua
 
 # ----------- end ----------
 
-echo "setup finished"
+echo "tikrit setup finished"

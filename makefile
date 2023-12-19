@@ -1,13 +1,8 @@
-compiler := gcc -o src/a.out
-spec := -lraylib -ldl -lpthread -lm -lX11
+compiler := love
 
-all: build run
+all: build
 
-build: src/main.c
-	clear && $(compiler) src/main.c $(spec)
-
-run: src/a.out
-	clear && ./src/a.out
+build: src
+	clear && love src
 
 clean:
-	clear && rm -f src/a.out
