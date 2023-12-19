@@ -1,25 +1,50 @@
+// FUA 
+
+    // immediate
+        // continue learning raylib
+        // implement global struct to store data and states
+        // write a serialization library to serialize data to json or txt files
+        // import other header files of F#-like functions
+
+    // 2 implement
+        // add in sprites
+
+// ---------- header files -----------
+
 #include <raylib.h>
 
 int main(void) {
-    // Initialization
+
+// ---------- initalization ---------- 
+
     const int screenWidth = 800;
     const int screenHeight = 450;
 
-    InitWindow(screenWidth, screenHeight, "Hello Raylib");
+    InitWindow(screenWidth, screenHeight, "Tikrit");
 
-    // Main game loop
+// ---------- presets ----------
+
+    const char titleText[13] = "Welc 2 Tikrit";
+    const int titleFontSize = 40;
+    int titleFontWidth = MeasureText(titleText, titleFontSize);
+    int titleFontHeight = titleFontSize;
+    int titleFontX = (screenWidth - titleFontWidth) / 2; // to help draw text in middle of screen
+    int titleFontY = (screenHeight - titleFontHeight) / 2;
+
+// ---------- main game loop -----------
+
     while (!WindowShouldClose()) {
-        // Update
-        // TODO: Your game logic goes here
 
-        // Draw
+        // drawing to screen
         BeginDrawing();
         ClearBackground(RAYWHITE);
-        DrawText("Hello, Raylib!", 10, 10, 20, DARKGRAY);
+        DrawText(titleText, titleFontX, titleFontY, titleFontSize, DARKGRAY);
         EndDrawing();
+
     }
 
-    // De-Initialization
+// ---------- de-initialization ----------
+
     CloseWindow();
 
     return 0;

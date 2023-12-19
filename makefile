@@ -4,10 +4,10 @@ spec := -lraylib -ldl -lpthread -lm -lX11
 all: build run
 
 build: src/main.c
-	$(compiler) src/main.c $(spec)
+	clear && $(compiler) src/main.c $(spec)
 
 run: src/a.out
-	./src/a.out
+	clear && ./src/a.out
 
 clean:
-	rm -f src/a.out
+	clear && rm -f src/a.out
