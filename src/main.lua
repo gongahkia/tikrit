@@ -1,13 +1,14 @@
 -- FUA
 
 -- immediate
-    -- when factoring in monster logic, i need to implement collisions as well
-    -- figure out how to implement path finding
+    -- figure out how to implement path finding for monster
+    -- implement mutliple monsters
     -- figure out how to implement dithering for light surrounding the player
     -- import sprites
+    -- animation for sprites
 
 -- 2 implement
-    -- work out gameplay loop and things to spice up gameplay
+    -- check installation on different platforms
 
 -- ---------- PRESETS ----------
 
@@ -19,16 +20,15 @@ local world = {
         coord = {0,0},
         items = {},
         speed = 200,
-        health = 3,
     }, 
 
     monster = {
-        coord = {0,0},
-        speed = 250,
-        health = 1
+        coord = {},
+        speed = 150,
     },
 
     wall = {
+        coord = {}
     }
 
 }
@@ -57,9 +57,11 @@ function deserialize(fileName)
         for line in data:gmatch("[^\r\n]+") do
             for char in line:gmatch("(.)") do
                 if char == "#" then
-                    table.insert(world.wall, {x * 20, y * 20})
+                    table.insert(world.wall.coord, {x * 20, y * 20})
                 elseif char == "@" then
                     world.player.coord = {x * 20, y * 20}
+                elseif char == "!" then
+                    table.insert(world.monster.coord, {x * 20, y * 20})
                 end
                 x = x + 1
             end 
@@ -85,12 +87,16 @@ function love.load() -- load function that runs once at the beginning; sets defa
 end
 
 -- FUA
--- add other update loops here for the monster 
+-- add other update loops here for the monster logic, encapsulate in a function based on player location => if too slow, then determine based on every 5 squares player moves
 function love.update(dt) -- update function that runs once every frame; dt is change in time
 
     player = world.player
-    monster = world.monster
+    monsters = world.monster
     walls = world.wall
+
+-- ---------- ENTITY MOVEMENT -----------
+
+-- monster logic
 
 -- player input
 
@@ -108,27 +114,53 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         player.coord[1] = player.coord[1] + (dt * player.speed)
     end
 
--- check collision between player and walls
-
-    for _, wallCoord in ipairs(walls) do
-        if checkCollision(wallCoord, player.coord) then
-            player.coord[1], player.coord[2] = storedX, storedY         
-        end
-    end
-
     if love.keyboard.isDown("escape") then 
         love.event.quit()
         print("event loop ended")
     end
 
+-- ---------- COLLISION ----------
+    -- implement path finding taken every 5 steps the player moves, so as to allow for more sophisticated movement and no need for collision check between wall and mosnter
+
+-- player and walls
+
+    for _, wallCoord in ipairs(walls.coord) do
+        if checkCollision(wallCoord, player.coord) then
+            player.coord[1], player.coord[2] = storedX, storedY         
+        end
+    end
+
+-- player and monster
+
+    for _, monsterCoord in ipairs(monsters.coord) do
+        if checkCollision(monsterCoord, player.coord) then
+            player.coord[1], player.coord[2] = storedX, storedY
+            love.event.quit()
+            print("player died")
+        end
+    end
+
 end
 
 function love.draw() -- draw function that runs once every frame
+
     playerCoord = world.player.coord
-    walls = world.wall
+    monsters = world.monster.coord
+    walls = world.wall.coord
+
     love.graphics.clear()
+
+    love.graphics.setColor(1,1,1)
     for _, wallCoord in ipairs(walls) do
         love.graphics.rectangle("fill", wallCoord[1], wallCoord[2], 20, 20)
     end 
+
+    love.graphics.setColor(1,0,0)
+    for _, monsterCoord in ipairs(monsters) do
+        love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
+    end 
+
+    love.graphics.setColor(0,1,0)
     love.graphics.rectangle("fill", playerCoord[1], playerCoord[2], 20, 20)
+
 end
