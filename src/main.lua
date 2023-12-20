@@ -1,19 +1,18 @@
 -- FUA
 
 -- immediate
-    -- learn general framework of engine
-    -- add function that parses text files
-    -- work out how i want to render entities and global elements through a dictionary or??
-    -- figure out core event loop
-    -- work out player collissions
-    -- work out player input
+    -- implement collisions as another function in line 105 and abstract away
+    -- when factoring in monster logic, i need to implement collisions as well
+    -- figure out how to implement path finding
+    -- figure out how to implement dithering for light surrounding the player
+    -- import sprites
 
 -- 2 implement
-    -- add here
+    -- work out gameplay loop and things to spice up gameplay
 
 -- ---------- PRESETS ----------
 
-local inspect = require("inspect")
+-- local inspect = require("inspect")
 
 local world = {
 
@@ -37,19 +36,18 @@ local world = {
 
 -- ---------- UTLITY ----------
 
--- FUA implement the below
-
--- FUA add wave function collapse or some cellular automata function to generate a random map
-function createMap()
+-- FUA 
+-- add code for map generation via wave function collapse or some cellular automata function to generate a random map
+function genMap()
 
 end
 
--- FUA add code to write the map data to a txt file
+-- FUA 
+-- add code to write the map data to a txt file
 function serialize() 
 
 end
 
--- FUA add code to create the static map data fed to the draw function based on the text file, this parses the text file
 function deserialize(fileName)
     local fhand = io.open(fileName, "r")
     if fhand then 
@@ -60,7 +58,7 @@ function deserialize(fileName)
         for line in data:gmatch("[^\r\n]+") do
             for char in line:gmatch("(.)") do
                 if char == "#" then
-                    table.insert(world.wall, {x, y})
+                    table.insert(world.wall, {x * 20, y * 20})
                 elseif char == "@" then
                     world.player.coord = {x * 20, y * 20}
                 end
@@ -69,7 +67,7 @@ function deserialize(fileName)
             x = 0
             y = y + 1
         end
-        return inspect(world)
+        -- return inspect(world)
     else
         print("error, unable to open local map file")
     end 
@@ -77,24 +75,23 @@ end
 
 -- ---------- EVENT LOOP ----------
 
--- load function that runs once at the beginning
-function love.load()
+function love.load() -- load function that runs once at the beginning; sets defaults
     love.window.setTitle("tikrit")
-    love.window.setMode(800,800)
+    love.window.setMode(600,600)
     print(deserialize("map/map1.txt"))
 end
 
--- update function that runs once every frame
--- dt is change in time
-
--- FUA: add other update loops here like for the monster
-
-function love.update(dt)
+-- FUA
+-- add other update loops here for the monster 
+function love.update(dt) -- update function that runs once every frame; dt is change in time
 
     player = world.player
     monster = world.monster
+    walls = world.wall
 
 -- player input
+
+    storedX, storedY = player.coord[1], player.coord[2]
 
     if love.keyboard.isDown("w") then 
         player.coord[2] = player.coord[2] - (dt * player.speed)
@@ -108,6 +105,12 @@ function love.update(dt)
         player.coord[1] = player.coord[1] + (dt * player.speed)
     end
 
+    for _, wallCoord in ipairs(walls) do
+        if wallCoord[1] + 20 > player.coord[1] and wallCoord[2] + 20 > player.coord[2] and player.coord[1] + 20 > wallCoord[1] and player.coord[2] + 20 > wallCoord[2] then
+            player.coord[1], player.coord[2] = storedX, storedY         
+        end
+    end
+
     if love.keyboard.isDown("escape") then 
         love.event.quit()
         print("event loop ended")
@@ -115,13 +118,15 @@ function love.update(dt)
 
 end
 
--- draw function that runs once every frame
 
--- FUA debug why rendering not working
-function love.draw()
+-- FUA 
+-- debug why rendering not working
+function love.draw() -- draw function that runs once every frame
+    playerCoord = world.player.coord
+    walls = world.wall
     love.graphics.clear()
-    for _, coord in pairs(world.wall) do
-        love.graphics.rectangle("fill", coord[1] * 20, coord[2] * 20, 20, 20)
+    for _, wallCoord in ipairs(walls) do
+        love.graphics.rectangle("fill", wallCoord[1], wallCoord[2], 20, 20)
     end 
-    love.graphics.rectangle("fill", world.player.coord[1], world.player.coord[2], 20, 20)
+    love.graphics.rectangle("fill", playerCoord[1], playerCoord[2], 20, 20)
 end
