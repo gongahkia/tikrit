@@ -26,7 +26,7 @@ else
 fi
 
 sudo apt install luarocks
-luarocks install inspect
+sudo luarocks install inspect
 
 if command -v make &> /dev/null; then
     echo "make already installed"
