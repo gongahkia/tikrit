@@ -1,7 +1,6 @@
 -- FUA
 
 -- immediate
-    -- implement collisions as another function in line 105 and abstract away
     -- when factoring in monster logic, i need to implement collisions as well
     -- figure out how to implement path finding
     -- figure out how to implement dithering for light surrounding the player
@@ -73,6 +72,10 @@ function deserialize(fileName)
     end 
 end
 
+function checkCollision(ACoord, BCoord)
+    return ACoord[1] + 20 > BCoord[1] and ACoord[2] + 20 > BCoord[2] and BCoord[1] + 20 > ACoord[1] and BCoord[2] + 20 > ACoord[2]
+end
+
 -- ---------- EVENT LOOP ----------
 
 function love.load() -- load function that runs once at the beginning; sets defaults
@@ -93,20 +96,22 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
     storedX, storedY = player.coord[1], player.coord[2]
 
-    if love.keyboard.isDown("w") then 
+    if love.keyboard.isDown("w") or love.keyboard.isDown("up") then 
         player.coord[2] = player.coord[2] - (dt * player.speed)
-    elseif love.keyboard.isDown("s") then 
+    elseif love.keyboard.isDown("s") or love.keyboard.isDown("down") then 
         player.coord[2] = player.coord[2] + (dt * player.speed)
     end
 
-    if love.keyboard.isDown("a") then
+    if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
         player.coord[1] = player.coord[1] - (dt * player.speed)
-    elseif love.keyboard.isDown("d") then
+    elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
         player.coord[1] = player.coord[1] + (dt * player.speed)
     end
 
+-- check collision between player and walls
+
     for _, wallCoord in ipairs(walls) do
-        if wallCoord[1] + 20 > player.coord[1] and wallCoord[2] + 20 > player.coord[2] and player.coord[1] + 20 > wallCoord[1] and player.coord[2] + 20 > wallCoord[2] then
+        if checkCollision(wallCoord, player.coord) then
             player.coord[1], player.coord[2] = storedX, storedY         
         end
     end
