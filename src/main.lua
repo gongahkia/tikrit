@@ -118,9 +118,6 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
 end
 
-
--- FUA 
--- debug why rendering not working
 function love.draw() -- draw function that runs once every frame
     playerCoord = world.player.coord
     walls = world.wall
