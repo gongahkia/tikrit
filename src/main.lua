@@ -102,6 +102,10 @@ function checkCollision(ACoord, BCoord)
     return ACoord[1] + 20 > BCoord[1] and ACoord[2] + 20 > BCoord[2] and BCoord[1] + 20 > ACoord[1] and BCoord[2] + 20 > ACoord[2]
 end
 
+function checkPlayerOutBounds(playerCoord)
+
+end
+
 -- ---------- EVENT LOOP ----------
 
 function love.load() -- load function that runs once at the beginning; sets defaults
@@ -128,6 +132,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         if elapsedTime > 5 then
             player.speed = player.speed - items.buffSpeed
             elapsedTime = 0
+            print("item wore off, player speed", player.speed)
         end
     end
     -- print(player.speed)
@@ -180,11 +185,11 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
 -- player and item
 
-    for i, itemCoord in ipairs(items.coord) do
+    for i, itemCoord in ipairs(items.coord) do 
         if checkCollision(itemCoord, player.coord) then
             player.speed = player.speed + items.buffSpeed
             table.remove(items.coord, i)
-            print("item picked up")
+            print("item picked up, player speed increased" , player.speed)
         end
     end
 
