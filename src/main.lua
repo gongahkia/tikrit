@@ -1,30 +1,37 @@
 -- FUA
 
 -- immediate
+    -- implement item pickup && item rendering 
     -- exit door for player (?)
     -- link rooms together
-    -- implement item pickup && item rendering 
-    -- implement seperate path finding algorithm that is easier than astar to reduce loading time
+        -- implement roguelike room generation similar to miziziz roguelike, where template rooms are created and items can be spawned in subsequently, rooms are randomly linked together
+    -- perhaps consider making enemies ghosts or implement different behaviour that circumvents the path-finding issue, maybe ghosts can just go through walls LOL
+        -- implement seperate path finding algorithm that is easier than astar to reduce loading time
+        -- https://youtu.be/rbYxbIMOZkE?si=OaYR9GwL9hIovhGO
     -- work out how to slow down monster movement
     -- implement mutliple monsters
     -- figure out how to implement dithering for light surrounding the player
     -- import sprites
     -- animation for sprites
     -- map generation
+    -- debug 
+        -- size of sprites issue
 
 -- 2 implement
-    -- check installation on different platforms
+    -- check installation on different platforms (OSX, Windows, Linux)
 
 -- ---------- PRESETS ----------
 
 -- local inspect = require("inspect")
 
+local elapsedTime = 0
+
 local world = {
 
     player = {
         coord = {0,0},
-        items = {},
         speed = 200,
+        items = {},
     }, 
 
     monster = {
@@ -33,7 +40,12 @@ local world = {
     },
 
     wall = {
-        coord = {}
+        coord = {},
+    },
+
+    item = {
+        coord = {},
+        buffSpeed = 200,
     }
 
 }
@@ -63,10 +75,12 @@ function deserialize(fileName)
             for char in line:gmatch("(.)") do
                 if char == "#" then
                     table.insert(world.wall.coord, {x * 20, y * 20})
-                elseif char == "@" then
-                    world.player.coord = {x * 20, y * 20}
+                elseif char == "?" then 
+                    table.insert(world.item.coord, {x * 20, y * 20})
                 elseif char == "!" then
                     table.insert(world.monster.coord, {x * 20, y * 20})
+                elseif char == "@" then
+                    world.player.coord = {x * 20, y * 20}
                 end
                 x = x + 1
             end 
@@ -94,11 +108,23 @@ end
 -- FUA
 -- add other update loops here for the monster logic, encapsulate in a function based on player location => if too slow, then determine based on every 5 squares player moves
 -- find a simpler quicker algorithm instead of astar
-function love.update(dt) -- update function that runs once every frame; dt is change in time
+function love.update(dt) -- update function that runs once every frame; dt is change in time and can be used for different tasks
 
     player = world.player
     monsters = world.monster
     walls = world.wall
+    items = world.item
+
+-- ---------- ITEM EFFECT TIMEOUT ----------
+
+    if player.speed > 200 then
+        elapsedTime = elapsedTime + dt
+        if elapsedTime > 5 then
+            player.speed = player.speed - items.buffSpeed
+            elapsedTime = 0
+        end
+    end
+    -- print(player.speed)
 
 -- ---------- ENTITY MOVEMENT -----------
 
@@ -126,9 +152,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     end
 
 -- ---------- COLLISION ----------
-    -- implement path finding taken every 5 steps the player moves, so as to allow for more sophisticated movement and no need for collision check between wall and mosnter
+    -- FUA implement something here based on above instructions
 
--- player and walls
+-- player and wall
 
     for _, wallCoord in ipairs(walls.coord) do
         if checkCollision(wallCoord, player.coord) then
@@ -146,6 +172,16 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         end
     end
 
+-- player and item
+
+    for i, itemCoord in ipairs(items.coord) do
+        if checkCollision(itemCoord, player.coord) then
+            player.speed = player.speed + items.buffSpeed
+            table.remove(items.coord, i)
+            print("item removed")
+        end
+    end
+
 end
 
 function love.draw() -- draw function that runs once every frame
@@ -153,6 +189,7 @@ function love.draw() -- draw function that runs once every frame
     playerCoord = world.player.coord
     monsters = world.monster.coord
     walls = world.wall.coord
+    items = world.item.coord
 
     love.graphics.clear()
 
@@ -165,6 +202,11 @@ function love.draw() -- draw function that runs once every frame
     for _, monsterCoord in ipairs(monsters) do
         love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
     end 
+
+    love.graphics.setColor(0,0,1)
+    for _, itemCoord in ipairs(items) do
+        love.graphics.rectangle("fill", itemCoord[1], itemCoord[2], 20, 20)
+    end
 
     love.graphics.setColor(0,1,0)
     love.graphics.rectangle("fill", playerCoord[1], playerCoord[2], 20, 20)
