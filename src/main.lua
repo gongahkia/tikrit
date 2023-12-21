@@ -12,9 +12,7 @@
     -- figure out how to implement dithering for light surrounding the player
     -- import sprites
     -- animation for sprites
-    -- map generation
-    -- debug 
-        -- size of sprites issue
+    -- map generation => ensure that one block tall corridors cannot be generated
 
 -- 2 implement
     -- check installation on different platforms (OSX, Windows, Linux)
@@ -30,7 +28,7 @@ local world = {
     player = {
         coord = {0,0},
         speed = 200,
-        items = {},
+        keyCount = 0,
     }, 
 
     monster = {
@@ -45,6 +43,11 @@ local world = {
     item = {
         coord = {},
         buffSpeed = 200,
+    },
+
+    key = {
+        coord = {},
+        totalCount = 0,
     }
 
 }
@@ -76,6 +79,9 @@ function deserialize(fileName)
                     table.insert(world.wall.coord, {x * 20, y * 20})
                 elseif char == "?" then 
                     table.insert(world.item.coord, {x * 20, y * 20})
+                elseif char == "$" then 
+                    table.insert(world.key.coord, {x * 20, y * 20})
+                    world.key.totalCount = world.key.totalCount + 1
                 elseif char == "!" then
                     table.insert(world.monster.coord, {x * 20, y * 20})
                 elseif char == "@" then
@@ -113,6 +119,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     monsters = world.monster
     walls = world.wall
     items = world.item
+    keys = world.key
 
 -- ---------- ITEM EFFECT TIMEOUT ----------
 
@@ -177,7 +184,24 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         if checkCollision(itemCoord, player.coord) then
             player.speed = player.speed + items.buffSpeed
             table.remove(items.coord, i)
-            print("item removed")
+            print("item picked up")
+        end
+    end
+
+-- player and key
+
+    for q, keyCoord in ipairs(keys.coord) do
+        if checkCollision(keyCoord, player.coord) then
+
+            table.remove(keys.coord, q)
+            player.keyCount = player.keyCount + 1
+            print("key pickedup", player.keyCount)
+
+            if player.keyCount == keys.totalCount then
+                love.event.quit()
+                print("all keys collected")
+            end
+
         end
     end
 
@@ -189,6 +213,7 @@ function love.draw() -- draw function that runs once every frame
     monsters = world.monster.coord
     walls = world.wall.coord
     items = world.item.coord
+    keys = world.key.coord
 
     love.graphics.clear()
 
@@ -205,6 +230,11 @@ function love.draw() -- draw function that runs once every frame
     love.graphics.setColor(0,0,1)
     for _, itemCoord in ipairs(items) do
         love.graphics.rectangle("fill", itemCoord[1], itemCoord[2], 20, 20)
+    end
+
+    love.graphics.setColor(1,1,0)
+    for _, keyCoord in ipairs(keys) do
+        love.graphics.rectangle("fill", keyCoord[1], keyCoord[2], 20, 20)
     end
 
     love.graphics.setColor(0,1,0)
