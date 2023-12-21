@@ -1,11 +1,16 @@
 -- FUA
 
 -- immediate
-    -- figure out how to implement path finding for monster
+    -- exit door for player (?)
+    -- link rooms together
+    -- implement item pickup && item rendering 
+    -- implement seperate path finding algorithm that is easier than astar to reduce loading time
+    -- work out how to slow down monster movement
     -- implement mutliple monsters
     -- figure out how to implement dithering for light surrounding the player
     -- import sprites
     -- animation for sprites
+    -- map generation
 
 -- 2 implement
     -- check installation on different platforms
@@ -88,6 +93,7 @@ end
 
 -- FUA
 -- add other update loops here for the monster logic, encapsulate in a function based on player location => if too slow, then determine based on every 5 squares player moves
+-- find a simpler quicker algorithm instead of astar
 function love.update(dt) -- update function that runs once every frame; dt is change in time
 
     player = world.player
