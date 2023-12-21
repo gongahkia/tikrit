@@ -1,18 +1,44 @@
 -- FUA
 
 -- immediate
-    -- exit door for player (?)
-    -- link rooms together
-        -- implement roguelike room generation similar to miziziz roguelike, where template rooms are created and items can be spawned in subsequently, rooms are randomly linked together
-    -- perhaps consider making enemies ghosts or implement different behaviour that circumvents the path-finding issue, maybe ghosts can just go through walls LOL
-        -- implement seperate path finding algorithm that is easier than astar to reduce loading time
-        -- https://youtu.be/rbYxbIMOZkE?si=OaYR9GwL9hIovhGO
-    -- work out how to slow down monster movement
-    -- implement mutliple monsters
-    -- figure out how to implement dithering for light surrounding the player
-    -- import sprites
-    -- animation for sprites
-    -- map generation => ensure that one block tall corridors cannot be generated
+    -- handle update function when entering another room to render map for entering map 2 after saving state for map 1
+        -- determine location of player at door based on the previous door location
+        -- then write code to determine which D should be rendered as a door and which should just be rendered as a wall
+        -- subsequently write code to determine which map to open based on an overall render map in the following style
+--[[
++------+                  
+| map1 |                  
+|      |                  
++------+                  
++------+ +------+ +------+
+| map2 | | map6 | | map4 |
+|      | |      | |      |
++------+ +------+ +------+
++------+          +------+
+| map3 |          | map7 |
+|      |          |      |
++------+          +------+
+                  +------+
+                  |  ap5 |
+                  |      |
+                  +------+
+]]--
+        -- link rooms together
+    -- map generation
+        -- work out system to track player current room on a map => store each map as a file name like map1 - map7(?)
+            -- randomise which of the 4 doors open
+            -- implement roguelike room generation similar to miziziz roguelike, where template rooms are created and items can be spawned in subsequently, rooms are randomly linked together
+        -- map generation => ensure that one block tall corridors cannot be generated
+    -- monster logic
+        -- perhaps consider making enemies ghosts or implement different behaviour that circumvents the path-finding issue, maybe ghosts can just go through walls LOL
+            -- implement seperate path finding algorithm that is easier than astar to reduce loading time
+            -- https://youtu.be/rbYxbIMOZkE?si=OaYR9GwL9hIovhGO
+        -- work out how to slow down monster movement
+        -- implement mutliple monsters
+    -- graphics
+        -- figure out how to implement dithering for light surrounding the player
+        -- import sprites
+        -- animation for sprites
 
 -- 2 implement
     -- check installation on different platforms (OSX, Windows, Linux)
@@ -29,6 +55,7 @@ local world = {
         coord = {0,0},
         speed = 200,
         keyCount = 0,
+        currRoom = 0,
     }, 
 
     monster = {
@@ -48,11 +75,34 @@ local world = {
     key = {
         coord = {},
         totalCount = 0,
+    },
+
+    door = {
+        coord = {},
     }
 
 }
 
--- ---------- UTLITY ----------
+-- ---------- GENERAL ----------
+
+function rstrip(str)
+    if #str > 0 and str:sub(#str) == "\n" then
+        return str:sub(1, #str - 1)
+    else
+        return str
+    end
+end
+
+function inside(targetCoord, table)
+    for _, coord in ipairs(table) do
+        if targetCoord[1] == coord[1] and targetCoord[2] == coord[2] then
+            return true
+        end 
+    end
+    return false
+end
+
+-- ---------- UTILITY ----------
 
 -- FUA 
 -- add code for map generation via wave function collapse or some cellular automata function to generate a random map
@@ -60,12 +110,34 @@ function genMap()
 
 end
 
--- FUA 
--- add code to write the map data to a txt file
-function serialize() 
-
+-- writes the map data to a txt file
+function serialize(fileName) 
+    local fhand = io.open(fileName, "w")
+    local fin = ""
+    for y = 0, 580, 20 do
+        local tem = ""
+        for x = 0, 580, 20 do
+            if inside({x,y}, world.wall.coord) then
+                tem = tem .. "#"
+            elseif #world.monster.coord ~= 0 and inside({x,y}, world.monster.coord) then
+                tem = tem .. "!"
+            elseif #world.item.coord ~= 0 and inside({x,y}, world.item.coord) then
+                tem = tem .. "?"
+            else
+                tem = tem .. "."
+            end
+        end
+        fin = fin .. tem .. "\n"
+    end
+    if fhand then
+        fhand:write(rstrip(fin))
+        fhand:close()
+    else
+        print("error, unable to open local map file")
+    end
 end
 
+-- reads txt file to map data
 function deserialize(fileName)
     local fhand = io.open(fileName, "r")
     if fhand then 
@@ -77,6 +149,8 @@ function deserialize(fileName)
             for char in line:gmatch("(.)") do
                 if char == "#" then
                     table.insert(world.wall.coord, {x * 20, y * 20})
+                elseif char == "D" then
+                    table.insert(world.door.coord, {x * 20, y * 20})
                 elseif char == "?" then 
                     table.insert(world.item.coord, {x * 20, y * 20})
                 elseif char == "$" then 
@@ -103,7 +177,25 @@ function checkCollision(ACoord, BCoord)
 end
 
 function checkPlayerOutBounds(playerCoord)
+    return playerCoord[1] < 0 or playerCoord[1] > 600 or playerCoord[2] < 0 or playerCoord[2] > 600
+end
 
+--[[ 
+    1
+2 center 3
+    4
+]]--
+
+function checkPlayerRoom(playerCoord)
+    if playerCoord[1] < 0 then
+        return 2
+    elseif playerCoord[1] > 600 then
+        return 3
+    elseif playerCoord[2] < 0 then 
+        return 1
+    elseif playerCoord[2] > 600 then
+        return 4
+    end
 end
 
 -- ---------- EVENT LOOP ----------
@@ -122,8 +214,17 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     player = world.player
     monsters = world.monster
     walls = world.wall
+    doors = world.door
     items = world.item
     keys = world.key
+
+-- ---------- PLAYER MOVE DIFFERENT ROOM ----------
+
+    if checkPlayerOutBounds(player.coord) then
+        print("player moves to room " .. checkPlayerRoom(player.coord))
+        love.event.quit()
+        serialize("map/map1-saved.txt")
+    end
 
 -- ---------- ITEM EFFECT TIMEOUT ----------
 
@@ -173,6 +274,14 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         end
     end
 
+-- player and door
+
+    for _, doorCoord in ipairs(doors.coord) do
+        if checkCollision(doorCoord, player.coord) then
+            player.coord[1], player.coord[2] = storedX, storedY 
+        end
+    end
+
 -- player and monster
 
     for _, monsterCoord in ipairs(monsters.coord) do
@@ -203,8 +312,8 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             print("key pickedup", player.keyCount)
 
             if player.keyCount == keys.totalCount then
-                love.event.quit()
-                print("all keys collected")
+                print("all keys collected, opening doors")
+                doors.coord = {}
             end
 
         end
@@ -217,6 +326,7 @@ function love.draw() -- draw function that runs once every frame
     playerCoord = world.player.coord
     monsters = world.monster.coord
     walls = world.wall.coord
+    doors = world.door.coord
     items = world.item.coord
     keys = world.key.coord
 
@@ -226,6 +336,11 @@ function love.draw() -- draw function that runs once every frame
     for _, wallCoord in ipairs(walls) do
         love.graphics.rectangle("fill", wallCoord[1], wallCoord[2], 20, 20)
     end 
+
+    love.graphics.setColor(1, 0.5, 0.5)
+    for _, doorCoord in ipairs(doors) do
+        love.graphics.rectangle("fill", doorCoord[1], doorCoord[2], 20, 20)
+    end
 
     love.graphics.setColor(1,0,0)
     for _, monsterCoord in ipairs(monsters) do
