@@ -1,7 +1,6 @@
 -- FUA
 
 -- immediate
-    -- implement item pickup && item rendering 
     -- exit door for player (?)
     -- link rooms together
         -- implement roguelike room generation similar to miziziz roguelike, where template rooms are created and items can be spawned in subsequently, rooms are randomly linked together
