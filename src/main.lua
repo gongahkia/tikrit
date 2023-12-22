@@ -1,8 +1,9 @@
 -- FUA
 
 -- immediate
+    -- work out door rendering after factoring in the existence or lack thereof of doors at a given room, write a function to update each room's coord
     -- handle update function when entering another room to render map for entering map 2 after saving state for map 1
-    -- work out generic event loop under update function which runs regardless of room
+    -- continue testing room rendering logic
     -- map generation
         -- work out system to track player current room on a map => store each map as a file name like map1 - map7(?)
             -- randomise which of the 4 doors open
@@ -45,7 +46,7 @@
 
 -- ---------- PRESETS ----------
 
-local inspect = require("inspect")
+-- local inspect = require("inspect")
 
 local elapsedTime = 0
 
@@ -55,7 +56,7 @@ local world = {
         coord = {0,0},
         speed = 200,
         keyCount = 0,
-        currRoom = 0,
+        currRoom = "1",
     }, 
 
     monster = {
@@ -142,12 +143,16 @@ function serialize(fileName)
     for y = 0, 580, 20 do
         local tem = ""
         for x = 0, 580, 20 do
-            if inside({x,y}, world.wall.coord) then
+            if #world.wall.coord ~= 0 and inside({x,y}, world.wall.coord) then
                 tem = tem .. "#"
+            elseif #world.door.coord ~= 0 and inside({x,y}, world.door.coord) then
+                tem = tem .. "D"
             elseif #world.monster.coord ~= 0 and inside({x,y}, world.monster.coord) then
                 tem = tem .. "!"
             elseif #world.item.coord ~= 0 and inside({x,y}, world.item.coord) then
                 tem = tem .. "?"
+            elseif #world.key.coord ~= 0 and inside({x,y}, world.key.coord) then
+                tem = tem .. "$"
             else
                 tem = tem .. "."
             end
@@ -197,19 +202,18 @@ function deserialize(fileName)
     end 
 end
 
--- resets table data
+-- resets table data except current room since that one needs to continue being tracked
 function reset(tbl)
     tbl.player.coord = {0,0}
     tbl.player.speed = 200
-    tbl.keyCount = 0
-    tbl.currRoom = 0
+    tbl.player.keyCount = 0
     tbl.monster.coord = {}
     tbl.monster.speed = 150
     tbl.wall.coord = {}
     tbl.item.coord = {}
     tbl.item.buffSpeed = 200
     tbl.key.coord = {}
-    tbl.key.totalcount = 0
+    tbl.key.totalCount = 0
     tbl.door.coord = {}
     return tbl
 end
@@ -311,13 +315,30 @@ function generateMap(fileName)
     return fin
 end
 
+function checkNextRoom(aMap, currRoom, currDoor)
+    for _, el in ipairs(aMap) do
+        -- print(inspect(el))
+        if el[1] == currRoom then
+            -- print(inspect(el[1]))
+            for _, val in ipairs(el[2]) do
+                -- print(inspect(val))
+                if val[1] == currDoor then
+                    -- print(inspect(val[1]))
+                    return val[2]
+                end
+            end
+        end
+    end
+end
+
 -- ---------- EVENT LOOP ----------
 
-function love.load() -- load function that runs once at the beginning; sets defaults
+function love.load() -- load function that runs once at the beginning; sets defaults of using room1
     love.window.setTitle("tikrit")
     love.window.setMode(600,600)
     print(deserialize("map/1.txt"))
-    print(inspect(generateMap("map/layout.txt")))
+    worldMap = generateMap("map/layout.txt")
+    -- print(inspect(worldMap))
 end
 
 -- FUA
@@ -334,16 +355,20 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
 -- ---------- PLAYER MOVE DIFFERENT ROOM ----------
 
-    if checkPlayerOutBounds(player.coord) then
+    if checkPlayerOutBounds(player.coord) then -- player moves to different room
 
+        -- print("--------------------\nplayer changing room")
         playerLoc = checkPlayerRoom(player.coord) 
-        -- print("player moves to room " .. inspect(playerLoc[1]) .. " and new coord is " .. inspect(playerLoc[2]))
-
-        serialize("map/1.txt") -- save past room data
+        -- print(inspect(playerLoc))
+        -- print("player moves to door" .. inspect(playerLoc[1]) .. " and new coord is " .. inspect(playerLoc[2]))
+        serialize(string.format("map/%s.txt",player.currRoom)) -- save past room data
         world = reset(world) -- resets world table data
-        deserialize("map/2.txt") -- load new room data
+        nextRoom = checkNextRoom(worldMap, player.currRoom, playerLoc[1])
+        deserialize(string.format("map/%s.txt",nextRoom)) -- load new room data
+        player.currRoom = nextRoom
         player.coord = playerLoc[2] -- new player location
         removeDoors(playerLoc[1]) -- removes doors so player can be instantiated
+        -- print("player now in" .. player.currRoom)
 
     end
 
