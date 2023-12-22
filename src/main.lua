@@ -2,7 +2,12 @@
 
 -- immediate
     -- handle update function when entering another room to render map for entering map 2 after saving state for map 1
-        -- determine location of player at door based on the previous door location
+        -- work out generic event loop under update function which runs regardless of room
+    -- map generation
+        -- work out system to track player current room on a map => store each map as a file name like map1 - map7(?)
+            -- randomise which of the 4 doors open
+            -- implement roguelike room generation similar to miziziz roguelike, where template rooms are created and items can be spawned in subsequently, rooms are randomly linked together
+        -- map generation => ensure that one block tall corridors cannot be generated
         -- then write code to determine which D should be rendered as a door and which should just be rendered as a wall
         -- subsequently write code to determine which map to open based on an overall render map in the following style
 --[[
@@ -23,12 +28,6 @@
                   |      |
                   +------+
 ]]--
-        -- link rooms together
-    -- map generation
-        -- work out system to track player current room on a map => store each map as a file name like map1 - map7(?)
-            -- randomise which of the 4 doors open
-            -- implement roguelike room generation similar to miziziz roguelike, where template rooms are created and items can be spawned in subsequently, rooms are randomly linked together
-        -- map generation => ensure that one block tall corridors cannot be generated
     -- monster logic
         -- perhaps consider making enemies ghosts or implement different behaviour that circumvents the path-finding issue, maybe ghosts can just go through walls LOL
             -- implement seperate path finding algorithm that is easier than astar to reduce loading time
@@ -93,13 +92,21 @@ function rstrip(str)
     end
 end
 
-function inside(targetCoord, table)
-    for _, coord in ipairs(table) do
+function inside(targetCoord, tbl)
+    for _, coord in ipairs(tbl) do
         if targetCoord[1] == coord[1] and targetCoord[2] == coord[2] then
             return true
         end 
     end
     return false
+end
+
+function removeByValue(targetValue, tbl)
+    for i, value in ipairs(tbl) do
+        if value[1] == targetValue[1] and value[2] == targetValue[2] then
+            table.remove(tbl, i)
+        end
+    end
 end
 
 -- ---------- UTILITY ----------
@@ -172,6 +179,23 @@ function deserialize(fileName)
     end 
 end
 
+-- resets table data
+function reset(tbl)
+    tbl.player.coord = {0,0}
+    tbl.player.speed = 200
+    tbl.keyCount = 0
+    tbl.currRoom = 0
+    tbl.monster.coord = {}
+    tbl.monster.speed = 150
+    tbl.wall.coord = {}
+    tbl.item.coord = {}
+    tbl.item.buffSpeed = 200
+    tbl.key.coord = {}
+    tbl.key.totalcount = 0
+    tbl.door.coord = {}
+    return tbl
+end
+
 function checkCollision(ACoord, BCoord)
     return ACoord[1] + 20 > BCoord[1] and ACoord[2] + 20 > BCoord[2] and BCoord[1] + 20 > ACoord[1] and BCoord[2] + 20 > ACoord[2]
 end
@@ -188,13 +212,30 @@ end
 
 function checkPlayerRoom(playerCoord)
     if playerCoord[1] < 0 then
-        return 2
+        return {2, {580,290}}
     elseif playerCoord[1] > 600 then
-        return 3
+        return {3, {0,290}}
     elseif playerCoord[2] < 0 then 
-        return 1
+        return {1, {290,580}}
     elseif playerCoord[2] > 600 then
-        return 4
+        return {4, {290,0}}
+    end
+end
+
+-- remove doors at a specific location
+function removeDoors(playerCurrRoom)
+    if playerLoc[1] == 1 then -- door 4
+        removeByValue({280,580},doors.coord)
+        removeByValue({300,580},doors.coord)
+    elseif playerLoc[1] == 2 then -- door 3
+        removeByValue({580,280},doors.coord)
+        removeByValue({580,300},doors.coord)
+    elseif playerLoc[1] == 3 then -- door 2
+        removeByValue({0,280},doors.coord)
+        removeByValue({0,300},doors.coord)
+    elseif playerLoc[1] == 4 then -- door 1
+        removeByValue({280,0},doors.coord)
+        removeByValue({300,0},doors.coord)
     end
 end
 
@@ -221,9 +262,15 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 -- ---------- PLAYER MOVE DIFFERENT ROOM ----------
 
     if checkPlayerOutBounds(player.coord) then
-        print("player moves to room " .. checkPlayerRoom(player.coord))
-        love.event.quit()
-        serialize("map/map1-saved.txt")
+        playerLoc = checkPlayerRoom(player.coord) 
+        -- print("player moves to room " .. inspect(playerLoc[1]) .. " and new coord is " .. inspect(playerLoc[2]))
+
+        serialize("map/map1.txt") -- save past room data
+        world = reset(world) -- resets world table data
+        deserialize("map/map2.txt") -- load new room data
+        player.coord = playerLoc[2] -- new player location
+        removeDoors(playerLoc[1]) -- removes doors so player can be instantiated
+
     end
 
 -- ---------- ITEM EFFECT TIMEOUT ----------
@@ -309,7 +356,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             table.remove(keys.coord, q)
             player.keyCount = player.keyCount + 1
-            print("key pickedup", player.keyCount)
+            print("key picked up", player.keyCount)
 
             if player.keyCount == keys.totalCount then
                 print("all keys collected, opening doors")
