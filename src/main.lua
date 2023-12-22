@@ -1,52 +1,33 @@
 -- FUA
 
 -- immediate
-    --* modify if conditional check in line 432 that currently just checks if there are more than 0 keys in a room, if so, assumes the room has just been instantiated once and does the door assignment, then avoids such an assignment in the future when all doors have been opened since doors will be unlocked when there are zero keys, maybe instead implement a running list of where players have visited and run off that instead to determine whether players have collected all keys in a room and if they have, then the door list and not wall check does not occur
-    -- make new levels in *-fresh.txt files from 1 - 15
-    -- implement a function that checks if a room only has one connection, if so, then it removes all key drops since those are unnecessary and replaces them with something else
-    -- randomise key locations and spawn points for certain items in each room
-    -- work out door rendering after factoring in the existence or lack thereof of doors at a given room, write a function to update each room's coord
-    -- handle update function when entering another room to render map for entering map 2 after saving state for map 1
+    -- make interesting level layouts for rooms 1 - 7 in *-fresh.txt files
+    -- make more interesting levels layouts as *-fresh,txt files for rooms 8 - 20
+    -- implement function that updates player minimap as a local file similar to layout.txt
+    -- write a function that generates layout.txt dynamically by mashing rooms together from 1 - 20, one map should only be 5 files max at a given time
+        -- implement roguelike room generation similar to miziziz roguelike, where template rooms are created and items can be spawned in subsequently, rooms are randomly linked together
+        -- randomise key locations and spawn points for certain items in each room
+    -- add an updating counter that displays world.player.overallKeyCount and can determine end of gameloop when that equates to a hardcoded number somewhere in the code update function
     -- continue testing room rendering logic
-    -- map generation
-        -- work out system to track player current room on a map => store each map as a file name like map1 - map7(?)
-            -- randomise which of the 4 doors open
-            -- implement roguelike room generation similar to miziziz roguelike, where template rooms are created and items can be spawned in subsequently, rooms are randomly linked together
-        -- map generation => ensure that one block tall corridors cannot be generated
-        -- then write code to determine which D should be rendered as a door and which should just be rendered as a wall
-        -- subsequently write code to determine which map to open based on an overall render map in the following style
-        -- write a function that generates layout.txt dynamically by mashing rooms together from 1 - 15, one map should only be 7 files big at a given time
---[[
-+------+                  
-|  1   |                  
-|      |                  
-+------+                  
-+------+ +------+ +------+
-|  2   | |  6   | |  4   |
-|      | |      | |      |
-+------+ +------+ +------+
-+------+          +------+
-|  3   |          |  7   |
-|      |          |      |
-+------+          +------+
-                  +------+
-                  |  5   |
-                  |      |
-                  +------+
-]]--
+    -- figure out how to implement dithering for light surrounding the player
+    -- add title screen, cutscenes, game over screen
     -- monster logic
-        -- perhaps consider making enemies ghosts or implement different behaviour that circumvents the path-finding issue, maybe ghosts can just go through walls LOL
+        -- perhaps consider making enemies ghosts that can ignore walls or implement different behaviour that circumvents the path-finding issue, maybe ghosts can just go through walls LOL
             -- implement seperate path finding algorithm that is easier than astar to reduce loading time
             -- https://youtu.be/rbYxbIMOZkE?si=OaYR9GwL9hIovhGO
         -- work out how to slow down monster movement
         -- implement mutliple monsters
+    -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
     -- graphics
-        -- figure out how to implement dithering for light surrounding the player
         -- import sprites
         -- animation for sprites
+    -- maybe fix(?)
+        -- sync up door openings for doors that have multiple connections(?) this might introduce issues so maybe don't bother cuz huge rehaul of the code
+        -- modify if conditional check in line 432 that currently just checks if there are more than 0 keys in a room, if so, assumes the room has just been instantiated once and does the door assignment, then avoids such an assignment in the future when all doors have been opened since doors will be unlocked when there are zero keys, maybe instead implement a running list of where players have visited and run off that instead to determine whether players have collected all keys in a room and if they have, then the door list and not wall check does not occur
+        -- implement a function that checks if a room only has one connection, if so, then it removes all key drops since those are unnecessary and replaces them with something else
+    -- check installation on different platforms (OSX, Windows, Linux)
 
 -- 2 implement
-    -- check installation on different platforms (OSX, Windows, Linux)
 
 -- ---------- PRESETS ----------
 
@@ -61,6 +42,7 @@ local world = {
         speed = 200,
         keyCount = 0,
         currRoom = "1",
+        overallKeyCount = 0,
     }, 
 
     monster = {
@@ -398,9 +380,6 @@ function love.load() -- load function that runs once at the beginning; sets defa
 
 end
 
--- FUA
--- add other update loops here for the monster logic, encapsulate in a function based on player location => if too slow, then determine based on every 5 squares player moves
--- find a simpler quicker algorithm instead of astar
 function love.update(dt) -- update function that runs once every frame; dt is change in time and can be used for different tasks
 
     player = world.player
@@ -409,6 +388,14 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     doors = world.door
     items = world.item
     keys = world.key
+
+-- ---------- WIN CONDITION WHEN ALL KEYS COLLECTED ----------
+
+-- FUA
+-- further spruce up this screen later
+    if player.overallKeyCount == 17 then
+        love.event.quit()
+    end 
 
 -- ---------- PLAYER MOVE DIFFERENT ROOM ----------
 
@@ -520,6 +507,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             table.remove(keys.coord, q)
             player.keyCount = player.keyCount + 1
+            player.overallKeyCount = player.overallKeyCount + 1
             print("key picked up", player.keyCount)
 
             if player.keyCount == keys.totalCount then
