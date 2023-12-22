@@ -1,6 +1,7 @@
 -- FUA
 
 -- immediate
+    -- in line 373, continue adding code to remove all door coordinates from world.door.coord table if not in doorList and to replace them with walls to achieve outcome of below line
     -- work out door rendering after factoring in the existence or lack thereof of doors at a given room, write a function to update each room's coord
     -- handle update function when entering another room to render map for entering map 2 after saving state for map 1
     -- continue testing room rendering logic
@@ -46,7 +47,7 @@
 
 -- ---------- PRESETS ----------
 
--- local inspect = require("inspect")
+local inspect = require("inspect")
 
 local elapsedTime = 0
 
@@ -331,14 +332,45 @@ function checkNextRoom(aMap, currRoom, currDoor)
     end
 end
 
+function extractDoors(aMap, currRoom)
+    local tem = {}
+    local fin = {}
+    for _, el in ipairs(aMap) do
+        if el[1] == currRoom then
+            for _, val in ipairs(el[2]) do
+                table.insert(tem, val[1])
+            end
+        end
+    end
+    for _, q in ipairs(tem) do
+        if q == 4 then -- door 4
+            table.insert(fin,{280,580})
+            table.insert(fin,{300,580})
+        elseif q == 3 then -- door 3
+            table.insert(fin,{580,280})
+            table.insert(fin,{580,300})
+        elseif q == 2 then -- door 2
+            table.insert(fin,{0,280})
+            table.insert(fin,{0,300})
+        elseif q == 1 then -- door 1
+            table.insert(fin,{280,0})
+            table.insert(fin,{300,0})
+        end
+    end
+    return fin
+end
+
 -- ---------- EVENT LOOP ----------
 
 function love.load() -- load function that runs once at the beginning; sets defaults of using room1
     love.window.setTitle("tikrit")
     love.window.setMode(600,600)
-    print(deserialize("map/1.txt"))
+    deserialize("map/1.txt")
     worldMap = generateMap("map/layout.txt")
-    -- print(inspect(worldMap))
+    print(inspect(worldMap))
+    doorList = extractDoors(worldMap, world.player.currRoom)
+    print(inspect(doorList))
+
 end
 
 -- FUA
