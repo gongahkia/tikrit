@@ -2,7 +2,7 @@
 
 -- immediate
     -- handle update function when entering another room to render map for entering map 2 after saving state for map 1
-        -- work out generic event loop under update function which runs regardless of room
+    -- work out generic event loop under update function which runs regardless of room
     -- map generation
         -- work out system to track player current room on a map => store each map as a file name like map1 - map7(?)
             -- randomise which of the 4 doors open
@@ -10,21 +10,22 @@
         -- map generation => ensure that one block tall corridors cannot be generated
         -- then write code to determine which D should be rendered as a door and which should just be rendered as a wall
         -- subsequently write code to determine which map to open based on an overall render map in the following style
+        -- write a function that generates layout.txt dynamically by mashing rooms together
 --[[
 +------+                  
-| map1 |                  
+|  1   |                  
 |      |                  
 +------+                  
 +------+ +------+ +------+
-| map2 | | map6 | | map4 |
+|  2   | |  6   | |  4   |
 |      | |      | |      |
 +------+ +------+ +------+
 +------+          +------+
-| map3 |          | map7 |
+|  3   |          |  7   |
 |      |          |      |
 +------+          +------+
                   +------+
-                  |  ap5 |
+                  |  5   |
                   |      |
                   +------+
 ]]--
@@ -44,7 +45,7 @@
 
 -- ---------- PRESETS ----------
 
--- local inspect = require("inspect")
+local inspect = require("inspect")
 
 local elapsedTime = 0
 
@@ -107,6 +108,23 @@ function removeByValue(targetValue, tbl)
             table.remove(tbl, i)
         end
     end
+end
+
+function split(str, delimiter)
+    local fin = {}
+    local tem = ""
+    for i = 1, #str do
+        local char = str:sub(i, i)
+        if char == delimiter then
+            table.insert(fin,tem)
+            tem = ""
+        else
+            tem = tem .. char
+        end
+    end
+    tem = tem:gsub("\r$", "")
+    table.insert(fin,tem)
+    return fin
 end
 
 -- ---------- UTILITY ----------
@@ -239,12 +257,67 @@ function removeDoors(playerCurrRoom)
     end
 end
 
+--[[
+            Room1
+              ^
+Room2 <-> currentRoom <-> Room3
+              v 
+            Room4
+]]--
+
+-- returns a nested table of the following syntax {currentRoomName, {Room1: RoomNameOfRoom}} based off the layout map file
+function generateMap(fileName)
+    local fhand = io.open(fileName, "r")
+    local fin = {}
+    local tem = {}
+    if fhand then 
+        for line in fhand:lines() do
+            table.insert(tem, split(line, "|"))
+            -- print(inspect(tem))
+        end
+    else
+        print("error, unable to open local map file")
+    end 
+    for i,iel in ipairs(tem) do
+        for q,qel in ipairs(tem[i]) do
+            -- print(tem[i][q])
+            eachRoom = {}
+            if tem[i][q] ~= "." then
+                if q ~= 1 then
+                    if tem[i][q-1] ~= "." then
+                        table.insert(eachRoom,{2,tem[i][q-1]})
+                    end
+                end
+                if q ~= #tem[i] then
+                    if tem[i][q+1] ~= "." then 
+                        table.insert(eachRoom,{3,tem[i][q+1]})
+                    end
+                end
+                if i ~= 1 then
+                    if tem[i-1][q] ~= "." then
+                        table.insert(eachRoom,{1,tem[i-1][q]})
+                    end
+                end
+                if i ~= #tem then
+                    if tem[i+1][q] ~= "." then
+                        table.insert(eachRoom,{4,tem[i+1][q]})
+                    end
+                end
+                table.insert(fin,{tem[i][q],eachRoom})
+            end
+        end
+    end
+    fhand:close()
+    return fin
+end
+
 -- ---------- EVENT LOOP ----------
 
 function love.load() -- load function that runs once at the beginning; sets defaults
     love.window.setTitle("tikrit")
     love.window.setMode(600,600)
-    print(deserialize("map/map1.txt"))
+    print(deserialize("map/1.txt"))
+    print(inspect(generateMap("map/layout.txt")))
 end
 
 -- FUA
@@ -262,12 +335,13 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 -- ---------- PLAYER MOVE DIFFERENT ROOM ----------
 
     if checkPlayerOutBounds(player.coord) then
+
         playerLoc = checkPlayerRoom(player.coord) 
         -- print("player moves to room " .. inspect(playerLoc[1]) .. " and new coord is " .. inspect(playerLoc[2]))
 
-        serialize("map/map1.txt") -- save past room data
+        serialize("map/1.txt") -- save past room data
         world = reset(world) -- resets world table data
-        deserialize("map/map2.txt") -- load new room data
+        deserialize("map/2.txt") -- load new room data
         player.coord = playerLoc[2] -- new player location
         removeDoors(playerLoc[1]) -- removes doors so player can be instantiated
 
