@@ -1,7 +1,10 @@
 -- FUA
 
 -- immediate
-    -- in line 373, continue adding code to remove all door coordinates from world.door.coord table if not in doorList and to replace them with walls to achieve outcome of below line
+    --* modify if conditional check in line 432 that currently just checks if there are more than 0 keys in a room, if so, assumes the room has just been instantiated once and does the door assignment, then avoids such an assignment in the future when all doors have been opened since doors will be unlocked when there are zero keys, maybe instead implement a running list of where players have visited and run off that instead to determine whether players have collected all keys in a room and if they have, then the door list and not wall check does not occur
+    -- make new levels in *-fresh.txt files from 1 - 15
+    -- implement a function that checks if a room only has one connection, if so, then it removes all key drops since those are unnecessary and replaces them with something else
+    -- randomise key locations and spawn points for certain items in each room
     -- work out door rendering after factoring in the existence or lack thereof of doors at a given room, write a function to update each room's coord
     -- handle update function when entering another room to render map for entering map 2 after saving state for map 1
     -- continue testing room rendering logic
@@ -12,7 +15,7 @@
         -- map generation => ensure that one block tall corridors cannot be generated
         -- then write code to determine which D should be rendered as a door and which should just be rendered as a wall
         -- subsequently write code to determine which map to open based on an overall render map in the following style
-        -- write a function that generates layout.txt dynamically by mashing rooms together
+        -- write a function that generates layout.txt dynamically by mashing rooms together from 1 - 15, one map should only be 7 files big at a given time
 --[[
 +------+                  
 |  1   |                  
@@ -47,7 +50,7 @@
 
 -- ---------- PRESETS ----------
 
-local inspect = require("inspect")
+-- local inspect = require("inspect")
 
 local elapsedTime = 0
 
@@ -360,16 +363,38 @@ function extractDoors(aMap, currRoom)
     return fin
 end
 
+function addDoorAsWall(map,doorList)
+    fin = {}
+    for i,doorCoord in ipairs(map.door.coord) do
+        local found = false
+        for q,presentDoorCoord in ipairs(doorList) do
+            if doorCoord[1] == presentDoorCoord[1] and doorCoord[2] == presentDoorCoord[2] then
+                found = true
+                break
+            end
+        end
+        if not found then 
+            table.insert(fin, doorCoord)
+        end
+    end
+    for _, doorAsWallCoord in ipairs(fin) do
+        table.insert(map.wall.coord, doorAsWallCoord)
+    end
+end
+
 -- ---------- EVENT LOOP ----------
 
 function love.load() -- load function that runs once at the beginning; sets defaults of using room1
+
     love.window.setTitle("tikrit")
     love.window.setMode(600,600)
     deserialize("map/1.txt")
     worldMap = generateMap("map/layout.txt")
-    print(inspect(worldMap))
+
+    -- checks connecting doors available and replace doors that should not exist with walls
     doorList = extractDoors(worldMap, world.player.currRoom)
-    print(inspect(doorList))
+    addDoorAsWall(world,doorList)
+    world.door.coord = doorList
 
 end
 
@@ -387,7 +412,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
 -- ---------- PLAYER MOVE DIFFERENT ROOM ----------
 
-    if checkPlayerOutBounds(player.coord) then -- player moves to different room
+    if checkPlayerOutBounds(player.coord) then -- player moves to different room, instantiate new room
 
         -- print("--------------------\nplayer changing room")
         playerLoc = checkPlayerRoom(player.coord) 
@@ -399,8 +424,16 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         deserialize(string.format("map/%s.txt",nextRoom)) -- load new room data
         player.currRoom = nextRoom
         player.coord = playerLoc[2] -- new player location
-        removeDoors(playerLoc[1]) -- removes doors so player can be instantiated
         -- print("player now in" .. player.currRoom)
+
+        -- checks connecting doors available and replace doors that should not exist with walls
+        doorList = extractDoors(worldMap, world.player.currRoom)
+        addDoorAsWall(world,doorList)
+        if world.key.totalCount ~= 0 then
+            world.door.coord = doorList
+        end
+
+        removeDoors(playerLoc[1]) -- removes door player entered from so player can be instantiated
 
     end
 
