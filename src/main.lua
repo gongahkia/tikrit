@@ -1,27 +1,26 @@
 -- FUA
 
 -- immediate
-    -- make interesting level layouts for rooms 1 - 7 in *-fresh.txt files
-    -- make more interesting levels layouts as *-fresh,txt files for rooms 8 - 20
-    -- implement function that updates player minimap as a local file similar to layout.txt
-    -- write a function that generates layout.txt dynamically by mashing rooms together from 1 - 20, one map should only be 5 files max at a given time
-        -- implement roguelike room generation similar to miziziz roguelike, where template rooms are created and items can be spawned in subsequently, rooms are randomly linked together
-        -- randomise key locations and spawn points for certain items in each room
-    -- add an updating counter that displays world.player.overallKeyCount and can determine end of gameloop when that equates to a hardcoded number somewhere in the code update function
-    -- continue testing room rendering logic
+    -- rework order of code in love.load function and move around deserialize to then choose a random room from the available world map, place the player in a random location in that room
+    -- or create a template introduction room that spawns in and is added after map generation is already done in layout.txt, instantiate player there, make a spawn-fresh.txt file and edit the makefile accordingly
+    -- randomise key locations and spawn points for certain items in each room
     -- figure out how to implement dithering for light surrounding the player
     -- add title screen, cutscenes, game over screen
+    -- continue testing room rendering logic
     -- monster logic
         -- perhaps consider making enemies ghosts that can ignore walls or implement different behaviour that circumvents the path-finding issue, maybe ghosts can just go through walls LOL
             -- implement seperate path finding algorithm that is easier than astar to reduce loading time
             -- https://youtu.be/rbYxbIMOZkE?si=OaYR9GwL9hIovhGO
         -- work out how to slow down monster movement
+        -- taking speed boost increases your speed but also the sound of your steps, which attracts monsters to your location
+        -- implement state machine for monsters similar to this enemy ai (https://youtu.be/LojAdI4eQsM?si=xFz7FxsnvlLw8fDM)
         -- implement mutliple monsters
     -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
     -- graphics
         -- import sprites
         -- animation for sprites
     -- maybe fix(?)
+        -- make more interesting levels layouts as *-fresh,txt files for rooms 10 - 20 based off fun movement and horror w limited light in mind, maybe 12 room-like rooms and 8 open layout rooms, tweak the genMap function to include these rooms as well
         -- sync up door openings for doors that have multiple connections(?) this might introduce issues so maybe don't bother cuz huge rehaul of the code
         -- modify if conditional check in line 432 that currently just checks if there are more than 0 keys in a room, if so, assumes the room has just been instantiated once and does the door assignment, then avoids such an assignment in the future when all doors have been opened since doors will be unlocked when there are zero keys, maybe instead implement a running list of where players have visited and run off that instead to determine whether players have collected all keys in a room and if they have, then the door list and not wall check does not occur
         -- implement a function that checks if a room only has one connection, if so, then it removes all key drops since those are unnecessary and replaces them with something else
@@ -31,7 +30,7 @@
 
 -- ---------- PRESETS ----------
 
--- local inspect = require("inspect")
+local inspect = require("inspect")
 
 local elapsedTime = 0
 
@@ -62,6 +61,7 @@ local world = {
     key = {
         coord = {},
         totalCount = 0,
+        globalCount = 0,
     },
 
     door = {
@@ -116,10 +116,80 @@ end
 
 -- ---------- UTILITY ----------
 
--- FUA 
--- add code for map generation via wave function collapse or some cellular automata function to generate a random map
-function genMap()
+function genMap(fileName) -- generates map layouts which are applied on layout.txt before generating the map
 
+    while true do
+
+        math.randomseed(os.time())
+        local fhand = io.open(fileName, "w")
+        local fin = ""
+        local tem = {}
+        
+        while true do
+
+            if #tem > 8 then -- max 9 rooms
+                break
+            end
+            local i = math.random(1, 24)
+            if i > 10 then
+                table.insert(tem, ".")
+            else
+                local found = false
+                for _, el in ipairs(tem) do
+                    if el == i then
+                        found = true
+                        break
+                    end
+                end
+                if not found then
+                    table.insert(tem, i)
+                end
+            end
+        end
+        
+        for i, val in ipairs(tem) do
+            if i % 3 == 0 or i == #tem then
+                fin = fin .. val .. "\n"
+            else
+                fin = fin .. val .. "|"
+            end
+        end
+        
+        fhand:write(fin)
+        fhand:close()
+
+        local temMap = generateMap(fileName)
+        local validGen = true
+
+        for _, el in ipairs(temMap) do
+            if #temMap <= 2 or #el[2] == 0 or horiVertDiagCheck(fileName) then
+                -- print("uh oh" .. inspect(el))
+                validGen = false
+                break
+            else
+                -- print("all good" .. inspect(el))
+            end
+        end
+
+        if validGen then
+            break
+        end
+
+    end
+end
+
+function horiVertDiagCheck(fileName)
+    local tem = {}
+    local fhand = io.open(fileName, "r")
+    if fhand then 
+        for line in fhand:lines() do
+            table.insert(tem, split(line, "|"))
+        end
+    else
+        print("error, unable to open local map file")
+    end 
+    fhand:close()
+    return tem[1][2] == "." and tem[2][2] == "." and tem[3][2] == "." or tem[2][1] == "." and tem[2][2] == "." and tem[2][3] == "." or tem[1][3] == "." and tem[2][2] == "." and tem[3][1] == "." or tem[1][1] == "." and tem[2][2] == "." and tem[3][3] == "." 
 end
 
 -- writes the map data to a txt file
@@ -364,6 +434,28 @@ function addDoorAsWall(map,doorList)
     end
 end
 
+function totalKeys() 
+    total = 0
+    for _, el in ipairs(worldMap) do
+        -- print(inspect(el[1]))
+        local fhand = io.open(string.format("map/%s.txt",el[1]), "r")
+        if fhand then 
+            for line in fhand:lines() do
+                for i = 1, #line, 1 do
+                    local char = line:sub(i,i)
+                    if char == "$" then
+                        total = total + 1
+                    end
+                end
+            end
+            fhand:close()
+        else
+            print("specified file cannot be opened")
+        end 
+    end
+    return total
+end
+
 -- ---------- EVENT LOOP ----------
 
 function love.load() -- load function that runs once at the beginning; sets defaults of using room1
@@ -371,12 +463,18 @@ function love.load() -- load function that runs once at the beginning; sets defa
     love.window.setTitle("tikrit")
     love.window.setMode(600,600)
     deserialize("map/1.txt")
+    -- genMap("map/layout.txt")
     worldMap = generateMap("map/layout.txt")
+    world.key.globalCount = totalKeys(worldMap)
+
+    print(inspect(worldMap))
+    -- print(totalKeys(worldMap))
 
     -- checks connecting doors available and replace doors that should not exist with walls
     doorList = extractDoors(worldMap, world.player.currRoom)
     addDoorAsWall(world,doorList)
     world.door.coord = doorList
+
 
 end
 
@@ -393,7 +491,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
 -- FUA
 -- further spruce up this screen later
-    if player.overallKeyCount == 17 then
+    if player.overallKeyCount == keys.globalCount then
         love.event.quit()
     end 
 
