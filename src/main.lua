@@ -1,7 +1,6 @@
 -- FUA
 
 -- immediate
-    -- make more interesting levels layouts as *-fresh,txt files for rooms 10 - 20 based off fun movement and horror w limited light in mind, maybe 12 room-like rooms and 8 open layout rooms, tweak the randomiseMap function to include these rooms as well
     -- figure out how to implement dithering for light surrounding the player
     -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
     -- graphics
@@ -126,8 +125,8 @@ function randomiseMap(fileName) -- generates map layouts which are applied on la
             if #tem > 8 then -- max 9 rooms
                 break
             end
-            local i = math.random(1, 24)
-            if i > 10 then
+            local i = math.random(1, 36)
+            if i > 15 then
                 table.insert(tem, ".")
             else
                 local found = false
@@ -159,11 +158,9 @@ function randomiseMap(fileName) -- generates map layouts which are applied on la
 
         for _, el in ipairs(temMap) do
             if #temMap <= 2 or #el[2] == 0 or horiVertDiagCheck(fileName) then
-                -- print("uh oh" .. inspect(el))
                 validGen = false
                 break
             else
-                -- print("all good" .. inspect(el))
             end
         end
 
