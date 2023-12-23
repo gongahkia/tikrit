@@ -1,10 +1,13 @@
 -- FUA
 
 -- immediate
-    -- rework order of code in love.load function and move around deserialize to then choose a random room from the available world map, place the player in a random location in that room
-    -- or create a template introduction room that spawns in and is added after map generation is already done in layout.txt, instantiate player there, make a spawn-fresh.txt file and edit the makefile accordingly
-    -- randomise key locations and spawn points for certain items in each room
+    -- make more interesting levels layouts as *-fresh,txt files for rooms 10 - 20 based off fun movement and horror w limited light in mind, maybe 12 room-like rooms and 8 open layout rooms, tweak the randomiseMap function to include these rooms as well
     -- figure out how to implement dithering for light surrounding the player
+    -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
+    -- graphics
+        -- import sprites
+        -- animation for sprites
+    -- randomise key locations and spawn points for certain items in each room
     -- add title screen, cutscenes, game over screen
     -- continue testing room rendering logic
     -- monster logic
@@ -15,18 +18,11 @@
         -- taking speed boost increases your speed but also the sound of your steps, which attracts monsters to your location
         -- implement state machine for monsters similar to this enemy ai (https://youtu.be/LojAdI4eQsM?si=xFz7FxsnvlLw8fDM)
         -- implement mutliple monsters
-    -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
-    -- graphics
-        -- import sprites
-        -- animation for sprites
     -- maybe fix(?)
-        -- make more interesting levels layouts as *-fresh,txt files for rooms 10 - 20 based off fun movement and horror w limited light in mind, maybe 12 room-like rooms and 8 open layout rooms, tweak the genMap function to include these rooms as well
         -- sync up door openings for doors that have multiple connections(?) this might introduce issues so maybe don't bother cuz huge rehaul of the code
         -- modify if conditional check in line 432 that currently just checks if there are more than 0 keys in a room, if so, assumes the room has just been instantiated once and does the door assignment, then avoids such an assignment in the future when all doors have been opened since doors will be unlocked when there are zero keys, maybe instead implement a running list of where players have visited and run off that instead to determine whether players have collected all keys in a room and if they have, then the door list and not wall check does not occur
         -- implement a function that checks if a room only has one connection, if so, then it removes all key drops since those are unnecessary and replaces them with something else
     -- check installation on different platforms (OSX, Windows, Linux)
-
--- 2 implement
 
 -- ---------- PRESETS ----------
 
@@ -116,7 +112,7 @@ end
 
 -- ---------- UTILITY ----------
 
-function genMap(fileName) -- generates map layouts which are applied on layout.txt before generating the map
+function randomiseMap(fileName) -- generates map layouts which are applied on layout.txt before generating the map
 
     while true do
 
@@ -456,25 +452,74 @@ function totalKeys()
     return total
 end
 
+function startingRoom(worldMap)
+    math.randomseed(os.time())
+    local tem = {}
+    for _,el in ipairs(worldMap) do
+        table.insert(tem,el)
+    end
+    return tem[math.random(1,#tem)][1]
+end
+
+function startingCoord(roomNumber, map)
+    math.randomseed(os.time())
+    genX = math.random(2,28)
+    genY = math.random(2,28)
+
+    fhand = io.open(string.format("map/%s.txt", roomNumber))
+    if fhand then 
+        local data = fhand:read("*all")
+        fhand:close()
+        local x = 0
+        local y = 0
+        for line in data:gmatch("[^\r\n]+") do
+            for char in line:gmatch("(.)") do
+                if genX == x and genY == y and char == "." then
+                    return {true, {genX * 20, genY * 20}}
+                end
+                x = x + 1
+            end 
+            x = 0
+            y = y + 1
+        end
+        return {false}
+    else
+        print("local map file cannot be opened")
+    end
+    fhand:close()
+end
+
+function validStartingRoomAndCoord(worldMap)
+    while true do 
+        startingRm = startingRoom(worldMap)
+        startingCoordSet = startingCoord(startingRm)
+        if startingCoordSet[1] then
+            startingCoord = startingCoordSet[2]
+            return {startingRm, startingCoord}
+        end
+    end
+end
+
 -- ---------- EVENT LOOP ----------
 
-function love.load() -- load function that runs once at the beginning; sets defaults of using room1
+function love.load() -- load function that runs once at the beginning
 
     love.window.setTitle("tikrit")
     love.window.setMode(600,600)
-    deserialize("map/1.txt")
-    -- genMap("map/layout.txt")
+    randomiseMap("map/layout.txt")
     worldMap = generateMap("map/layout.txt")
     world.key.globalCount = totalKeys(worldMap)
-
-    print(inspect(worldMap))
-    -- print(totalKeys(worldMap))
-
-    -- checks connecting doors available and replace doors that should not exist with walls
-    doorList = extractDoors(worldMap, world.player.currRoom)
+    playerRoomCoord = validStartingRoomAndCoord(worldMap)
+    world.player.currRoom = playerRoomCoord[1]
+    world.player.coord = playerRoomCoord[2]
+    deserialize(string.format("map/%s.txt", playerRoomCoord[1]))
+    doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
     addDoorAsWall(world,doorList)
     world.door.coord = doorList
 
+    -- print(inspect(worldMap))
+    -- print(totalKeys(worldMap))
+    -- print(inspect(validStartingRoomAndCoord(worldMap)))
 
 end
 
@@ -492,6 +537,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 -- FUA
 -- further spruce up this screen later
     if player.overallKeyCount == keys.globalCount then
+        serialize(string.format("map/%s.txt",player.currRoom))
         love.event.quit()
     end 
 
@@ -499,26 +545,24 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
     if checkPlayerOutBounds(player.coord) then -- player moves to different room, instantiate new room
 
-        -- print("--------------------\nplayer changing room")
         playerLoc = checkPlayerRoom(player.coord) 
-        -- print(inspect(playerLoc))
-        -- print("player moves to door" .. inspect(playerLoc[1]) .. " and new coord is " .. inspect(playerLoc[2]))
         serialize(string.format("map/%s.txt",player.currRoom)) -- save past room data
         world = reset(world) -- resets world table data
         nextRoom = checkNextRoom(worldMap, player.currRoom, playerLoc[1])
         deserialize(string.format("map/%s.txt",nextRoom)) -- load new room data
         player.currRoom = nextRoom
         player.coord = playerLoc[2] -- new player location
-        -- print("player now in" .. player.currRoom)
 
-        -- checks connecting doors available and replace doors that should not exist with walls
-        doorList = extractDoors(worldMap, world.player.currRoom)
+        doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
         addDoorAsWall(world,doorList)
         if world.key.totalCount ~= 0 then
             world.door.coord = doorList
         end
-
         removeDoors(playerLoc[1]) -- removes door player entered from so player can be instantiated
+
+        -- print(inspect(playerLoc))
+        -- print("player moves to door" .. inspect(playerLoc[1]) .. " and new coord is " .. inspect(playerLoc[2]))
+        -- print("player now in" .. player.currRoom)
 
     end
 
@@ -532,11 +576,14 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             print("item wore off, player speed", player.speed)
         end
     end
+
     -- print(player.speed)
 
 -- ---------- ENTITY MOVEMENT -----------
 
 -- monster logic
+-- FUA
+-- add code here
 
 -- player input
 
@@ -560,7 +607,6 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     end
 
 -- ---------- COLLISION ----------
-    -- FUA implement something here based on above instructions
 
 -- player and wall
 
