@@ -1,11 +1,15 @@
 -- FUA
 
 -- immediate
-    -- debug line 529 and 729 to work out why I can't load player sprites to the screen
-    -- work out code to determine which sprite to paint for which kind of floor, wall and door, render it dynamically, vary the walls floor and door tiles
-    -- add offset to render 16 by 16 sprite in centre of a 20 by 20 frame, with 2px offset on each side of the sprite? (add in love.draw() portion)
+    -- add sprites for opening chest
+    -- add sprites for opening doors => determine for each room which doors there are, and below those doors dont paint wall, paint open door
+    -- work out what to draw on top of what in the love.draw() loop to ensure things render accordingly
+    -- work on win and lose condition => copy win condition for what i did for lose condition
+    -- add a function outside of the love.draw() loop that determines the randomised floor tiling between floor-stone-1 and 2 for each room, and feeds that input into the floor drawing portion of the love.draw() function and does this for every room in roomList
+    -- do the same thing for the walls => this might be a bit hard, see how
+    -- might want to consider reworking loop in love.load() to first load layout map succesfully before opening window, can print debug info to stdout while the layout is still loading, perhaps display every possible configuration
     -- add sprites for dead player that appears when player touches ghost
-    -- add sprites for opening chest (?)
+    -- shaders for love2d?
     -- add logic for variations of player character who can move faster, teleport and other upgrades
     -- add sprites for other characters and shop keeper and ranged attacks from Kenny's tiny dungeon art pack
     -- randomise key locations and spawn points for certain items in each room
@@ -43,6 +47,7 @@ local world = {
         keyCount = 0,
         currRoom = "1",
         overallKeyCount = 0,
+        alive = true,
     }, 
 
     monster = {
@@ -262,6 +267,7 @@ function reset(tbl)
     tbl.player.coord = {0,0}
     tbl.player.speed = 200
     tbl.player.keyCount = 0
+    tbl.player.alive = true
     tbl.monster.coord = {}
     tbl.monster.speed = 150
     tbl.wall.coord = {}
@@ -526,7 +532,30 @@ function love.load() -- load function that runs once at the beginning
 
     -- SPRITE LOADING
 
-    -- playerSprite = love.graphics.newImage("../asset/sprite/player-default.png")
+    playerSprite = love.graphics.newImage("sprite/player-default.png")
+    deadPlayerSprite = love.graphics.newImage("sprite/player-tombstone.png")
+    ghostSprite1 = love.graphics.newImage("sprite/ghost-1.png")
+    ghostSprite2 = love.graphics.newImage("sprite/ghost-2.png")
+    itemSprite = love.graphics.newImage("sprite/potion-1.png")
+    floorSprite1 = love.graphics.newImage("sprite/floor-stone-1.png")
+    floorSprite2 = love.graphics.newImage("sprite/floor-stone-2.png")
+    openedDoorSprite = love.graphics.newImage("sprite/opened-door.png")
+    closedDoorSprite = love.graphics.newImage("sprite/closed-door.png")
+    openedChestSprite = love.graphics.newImage("sprite/opened-chest.png")
+    closedChestSprite = love.graphics.newImage("sprite/closed-chest.png")
+    topBorderSprite = love.graphics.newImage("sprite/top-border.png")
+    topLeftBorderSprite = love.graphics.newImage("sprite/top-left-border.png")
+    topRightBorderSprite = love.graphics.newImage("sprite/top-right-border.png")
+    middleLeftBorderSprite = love.graphics.newImage("sprite/middle-left-border.png")
+    middleRightBorderSprite = love.graphics.newImage("sprite/middle-right-border.png")
+    bottomBorderSprite = love.graphics.newImage("sprite/bottom-border.png")
+    bottomLeftBorderSprite = love.graphics.newImage("sprite/bottom-left-border.png")
+    bottomRightBorderSprite = love.graphics.newImage("sprite/bottom-right-border.png")
+    wallSprite1 = love.graphics.newImage("sprite/dirt-wall-1.png")
+    wallSprite2 = love.graphics.newImage("sprite/dirt-wall-2.png")
+    wallSprite3 = love.graphics.newImage("sprite/dirt-wall-3.png")
+
+    -- print(love.filesystem.getWorkingDirectory())
 
 end
 
@@ -539,11 +568,20 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     items = world.item
     keys = world.key
 
+-- ---------- LOSE CONDITION WHEN PLAYER DIES ----------
+
+-- FUA
+-- further spruce up the lose screen later
+    if not player.alive then
+        serialize(string.format("map/%s.txt",player.currRoom))
+        -- love.event.quit()
+    end
+
 -- ---------- WIN CONDITION WHEN ALL KEYS COLLECTED ----------
 
 -- FUA
--- further spruce up this screen later
-    if player.overallKeyCount == keys.globalCount then
+-- further spruce up the win screen later
+    if player.overallKeyCount == keys.globalCount and player.alive then
         serialize(string.format("map/%s.txt",player.currRoom))
         love.event.quit()
     end 
@@ -588,90 +626,100 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
 -- ---------- ENTITY MOVEMENT -----------
 
--- monster logic
 -- FUA
 -- add code here
+-- monster logic
 
 -- player input
 
-    storedX, storedY = player.coord[1], player.coord[2]
-
-    if love.keyboard.isDown("w") or love.keyboard.isDown("up") then 
-        player.coord[2] = player.coord[2] - (dt * player.speed)
-    elseif love.keyboard.isDown("s") or love.keyboard.isDown("down") then 
-        player.coord[2] = player.coord[2] + (dt * player.speed)
-    end
-
-    if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
-        player.coord[1] = player.coord[1] - (dt * player.speed)
-    elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
-        player.coord[1] = player.coord[1] + (dt * player.speed)
-    end
+    -- player escape screen
 
     if love.keyboard.isDown("escape") then 
         love.event.quit()
         print("event loop ended")
     end
 
--- ---------- COLLISION ----------
+    -- player movement
 
--- player and wall
+    if player.alive then
 
-    for _, wallCoord in ipairs(walls.coord) do
-        if checkCollision(wallCoord, player.coord) then
-            player.coord[1], player.coord[2] = storedX, storedY         
+        storedX, storedY = player.coord[1], player.coord[2]
+
+        if love.keyboard.isDown("w") or love.keyboard.isDown("up") then 
+            player.coord[2] = player.coord[2] - (dt * player.speed)
+        elseif love.keyboard.isDown("s") or love.keyboard.isDown("down") then 
+            player.coord[2] = player.coord[2] + (dt * player.speed)
         end
-    end
 
--- player and door
-
-    for _, doorCoord in ipairs(doors.coord) do
-        if checkCollision(doorCoord, player.coord) then
-            player.coord[1], player.coord[2] = storedX, storedY 
+        if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
+            player.coord[1] = player.coord[1] - (dt * player.speed)
+        elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
+            player.coord[1] = player.coord[1] + (dt * player.speed)
         end
-    end
 
--- player and monster
+    -- ---------- COLLISION ----------
 
-    for _, monsterCoord in ipairs(monsters.coord) do
-        if checkCollision(monsterCoord, player.coord) then
-            player.coord[1], player.coord[2] = storedX, storedY
-            love.event.quit()
-            print("player died")
-        end
-    end
+    -- player and wall
 
--- player and item
-
-    for i, itemCoord in ipairs(items.coord) do 
-        if checkCollision(itemCoord, player.coord) then
-            player.speed = player.speed + items.buffSpeed
-            table.remove(items.coord, i)
-            print("item picked up, player speed increased" , player.speed)
-        end
-    end
-
--- player and key
-
-    for q, keyCoord in ipairs(keys.coord) do
-        if checkCollision(keyCoord, player.coord) then
-
-            table.remove(keys.coord, q)
-            player.keyCount = player.keyCount + 1
-            player.overallKeyCount = player.overallKeyCount + 1
-            print("key picked up", player.keyCount)
-
-            if player.keyCount == keys.totalCount then
-                print("all keys collected, opening doors")
-                doors.coord = {}
+        for _, wallCoord in ipairs(walls.coord) do
+            if checkCollision(wallCoord, player.coord) then
+                player.coord[1], player.coord[2] = storedX, storedY         
             end
+        end
 
+    -- player and door
+
+        for _, doorCoord in ipairs(doors.coord) do
+            if checkCollision(doorCoord, player.coord) then
+                player.coord[1], player.coord[2] = storedX, storedY 
+            end
+        end
+
+    -- player and monster
+
+        for _, monsterCoord in ipairs(monsters.coord) do
+            if checkCollision(monsterCoord, player.coord) then
+                player.coord[1], player.coord[2] = storedX, storedY
+                player.alive = false
+                print("player died")
+                -- love.event.quit()
+            end
+        end
+
+    -- player and item
+
+        for i, itemCoord in ipairs(items.coord) do 
+            if checkCollision(itemCoord, player.coord) then
+                player.speed = player.speed + items.buffSpeed
+                table.remove(items.coord, i)
+                print("item picked up, player speed increased" , player.speed)
+            end
+        end
+
+    -- player and key
+
+        for q, keyCoord in ipairs(keys.coord) do
+            if checkCollision(keyCoord, player.coord) then
+
+                table.remove(keys.coord, q)
+                player.keyCount = player.keyCount + 1
+                player.overallKeyCount = player.overallKeyCount + 1
+                print("key picked up", player.keyCount)
+
+                if player.keyCount == keys.totalCount then
+                    print("all keys collected, opening doors")
+                    doors.coord = {}
+                end
+
+            end
         end
     end
 
 end
 
 function love.draw() -- draw function that runs once every frame
+
+    math.randomseed(os.time())
 
     playerCoord = world.player.coord
     monsters = world.monster.coord
@@ -682,50 +730,88 @@ function love.draw() -- draw function that runs once every frame
 
     love.graphics.clear()
 
-    -- draw floor background tileset; everything else is drawn over this
+    -- DRAW FLOOR TILESET; everything else is drawn over this
 
-    love.graphics.setColor(173/255, 216/255, 230/255, 1)
-    love.graphics.rectangle("fill",0,0,600,600) -- sets background tile set, all the other graphics are overlayed on top
+    for y = 20, 580, 20 do
+        for x = 20, 580, 20 do
+            love.graphics.draw(floorSprite1, x, y)
+        end
+    end
 
-    -- draw walls
+    -- love.graphics.setColor(173/255, 216/255, 230/255, 1)
+    -- love.graphics.rectangle("fill",0,0,600,600)
 
-    love.graphics.setColor(1,1,1)
+    -- DRAW WALLS
+
+    -- love.graphics.setColor(1,1,1)
     for _, wallCoord in ipairs(walls) do
-        love.graphics.rectangle("fill", wallCoord[1], wallCoord[2], 20, 20)
+        love.graphics.draw(wallSprite1, wallCoord[1], wallCoord[2])
+        -- love.graphics.rectangle("fill", wallCoord[1], wallCoord[2], 20, 20)
     end 
 
-    -- draw doors
+    -- DRAW BORDERS OF SCREEN
 
-    love.graphics.setColor(1, 0.5, 0.5)
+    for y = 0, 580, 20 do
+        for x = 0, 580, 20 do
+            if y == 0 then 
+                love.graphics.draw(topBorderSprite, x, y)
+            elseif y == 580 then
+                love.graphics.draw(bottomBorderSprite, x, y)
+            elseif x == 0 then
+                love.graphics.draw(middleLeftBorderSprite, x, y)
+            elseif x == 580 then
+                love.graphics.draw(middleRightBorderSprite, x, y)
+            else
+                -- do nothing if any other coordinate
+            end
+        end
+    end
+    love.graphics.draw(topLeftBorderSprite, 0, 0)
+    love.graphics.draw(topRightBorderSprite, 580, 0)
+    love.graphics.draw(bottomLeftBorderSprite, 0, 580)
+    love.graphics.draw(bottomRightBorderSprite, 580, 580)
+
+    -- DRAW DOORS
+
+    -- love.graphics.setColor(1, 0.5, 0.5)
     for _, doorCoord in ipairs(doors) do
-        love.graphics.rectangle("fill", doorCoord[1], doorCoord[2], 20, 20)
+        love.graphics.draw(closedDoorSprite, doorCoord[1], doorCoord[2])
+        -- love.graphics.rectangle("fill", doorCoord[1], doorCoord[2], 20, 20)
     end
 
-    -- draw monsters
+    -- DRAW MONSTERS
 
-    love.graphics.setColor(1,0,0)
+    -- love.graphics.setColor(1,0,0)
     for _, monsterCoord in ipairs(monsters) do
-        love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
+        love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2])
+        -- love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
     end 
 
-    -- draw item pickups
+    -- DRAW ITEM PICKUPS
 
-    love.graphics.setColor(0,0,1)
+    -- love.graphics.setColor(0,0,1)
     for _, itemCoord in ipairs(items) do
-        love.graphics.rectangle("fill", itemCoord[1], itemCoord[2], 20, 20)
+        love.graphics.draw(itemSprite, itemCoord[1], itemCoord[2])
+        -- love.graphics.rectangle("fill", itemCoord[1], itemCoord[2], 20, 20)
     end
 
-    -- draw keys 
+    -- DRAW KEYS
 
-    love.graphics.setColor(1,1,0)
+    -- love.graphics.setColor(1,1,0)
     for _, keyCoord in ipairs(keys) do
-        love.graphics.rectangle("fill", keyCoord[1], keyCoord[2], 20, 20)
+        love.graphics.draw(closedChestSprite, keyCoord[1], keyCoord[2])
+        -- love.graphics.rectangle("fill", keyCoord[1], keyCoord[2], 20, 20)
     end
 
-    -- draw player character
+    -- DRAW PLAYER CHARACTER
 
-    love.graphics.setColor(0,1,0)
-    love.graphics.rectangle("fill", playerCoord[1], playerCoord[2], 20, 20)
-    -- love.graphics.draw(playerSprite, playerCoord[1], playerCoord[2])
+    if world.player.alive then
+        love.graphics.draw(playerSprite, playerCoord[1], playerCoord[2])
+    else
+        love.graphics.draw(deadPlayerSprite, playerCoord[1], playerCoord[2])
+    end
+
+    -- love.graphics.setColor(0,1,0)
+    -- love.graphics.rectangle("fill", playerCoord[1], playerCoord[2], 20, 20)
 
 end
