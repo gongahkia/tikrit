@@ -2,7 +2,7 @@
 
 ![](asset/README/tikrit-origin.png)
 
-Sprites from Kenny's [tiny dungeon](https://kenney.nl/assets/tiny-dungeon) asset pack.
+Sprites from Kenney's [tiny dungeon](https://kenney.nl/assets/tiny-dungeon) asset pack.
 
 ## Installation
 
