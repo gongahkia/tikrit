@@ -1,6 +1,6 @@
 # Tikrit
 
-![](asset/README/tikrit-origin.png)
+![](asset/tikrit-origin.png)
 
 Sprites from Kenney's [tiny dungeon](https://kenney.nl/assets/tiny-dungeon) asset pack.
 
