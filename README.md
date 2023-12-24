@@ -1,6 +1,8 @@
 # Tikrit
 
-![](asset/tikrit-origin.png)
+![](asset/README/tikrit-origin.png)
+
+Sprites from Kenny's [tiny dungeon](https://kenney.nl/assets/tiny-dungeon) asset pack.
 
 ## Installation
 

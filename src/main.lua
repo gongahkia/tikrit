@@ -1,13 +1,22 @@
 -- FUA
 
 -- immediate
+    -- debug line 529 and 729 to work out why I can't load player sprites to the screen
+    -- work out code to determine which sprite to paint for which kind of floor, wall and door, render it dynamically, vary the walls floor and door tiles
+    -- add offset to render 16 by 16 sprite in centre of a 20 by 20 frame, with 2px offset on each side of the sprite? (add in love.draw() portion)
+    -- add sprites for dead player that appears when player touches ghost
+    -- add sprites for opening chest (?)
+    -- add logic for variations of player character who can move faster, teleport and other upgrades
+    -- add sprites for other characters and shop keeper and ranged attacks from Kenny's tiny dungeon art pack
+    -- randomise key locations and spawn points for certain items in each room
+    -- add title screen, cutscenes, game over screen
     -- figure out how to implement dithering for light surrounding the player
     -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
+    -- integrate make file commands into main program loop
     -- graphics
         -- import sprites
         -- animation for sprites
-    -- randomise key locations and spawn points for certain items in each room
-    -- add title screen, cutscenes, game over screen
+        -- import background sprites to be painted below every other layer in the love.draw() function
     -- continue testing room rendering logic
     -- monster logic
         -- perhaps consider making enemies ghosts that can ignore walls or implement different behaviour that circumvents the path-finding issue, maybe ghosts can just go through walls LOL
@@ -17,15 +26,12 @@
         -- taking speed boost increases your speed but also the sound of your steps, which attracts monsters to your location
         -- implement state machine for monsters similar to this enemy ai (https://youtu.be/LojAdI4eQsM?si=xFz7FxsnvlLw8fDM)
         -- implement mutliple monsters
-    -- maybe fix(?)
-        -- sync up door openings for doors that have multiple connections(?) this might introduce issues so maybe don't bother cuz huge rehaul of the code
-        -- modify if conditional check in line 432 that currently just checks if there are more than 0 keys in a room, if so, assumes the room has just been instantiated once and does the door assignment, then avoids such an assignment in the future when all doors have been opened since doors will be unlocked when there are zero keys, maybe instead implement a running list of where players have visited and run off that instead to determine whether players have collected all keys in a room and if they have, then the door list and not wall check does not occur
-        -- implement a function that checks if a room only has one connection, if so, then it removes all key drops since those are unnecessary and replaces them with something else
+    -- implement a function that checks if a room only has one connection, if so, then it removes all key drops since those are unnecessary and replaces them with something else
     -- check installation on different platforms (OSX, Windows, Linux)
 
 -- ---------- PRESETS ----------
 
-local inspect = require("inspect")
+-- local inspect = require("inspect")
 
 local elapsedTime = 0
 
@@ -518,6 +524,10 @@ function love.load() -- load function that runs once at the beginning
     -- print(totalKeys(worldMap))
     -- print(inspect(validStartingRoomAndCoord(worldMap)))
 
+    -- SPRITE LOADING
+
+    -- playerSprite = love.graphics.newImage("../asset/sprite/player-default.png")
+
 end
 
 function love.update(dt) -- update function that runs once every frame; dt is change in time and can be used for different tasks
@@ -672,32 +682,50 @@ function love.draw() -- draw function that runs once every frame
 
     love.graphics.clear()
 
+    -- draw floor background tileset; everything else is drawn over this
+
+    love.graphics.setColor(173/255, 216/255, 230/255, 1)
+    love.graphics.rectangle("fill",0,0,600,600) -- sets background tile set, all the other graphics are overlayed on top
+
+    -- draw walls
+
     love.graphics.setColor(1,1,1)
     for _, wallCoord in ipairs(walls) do
         love.graphics.rectangle("fill", wallCoord[1], wallCoord[2], 20, 20)
     end 
+
+    -- draw doors
 
     love.graphics.setColor(1, 0.5, 0.5)
     for _, doorCoord in ipairs(doors) do
         love.graphics.rectangle("fill", doorCoord[1], doorCoord[2], 20, 20)
     end
 
+    -- draw monsters
+
     love.graphics.setColor(1,0,0)
     for _, monsterCoord in ipairs(monsters) do
         love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
     end 
+
+    -- draw item pickups
 
     love.graphics.setColor(0,0,1)
     for _, itemCoord in ipairs(items) do
         love.graphics.rectangle("fill", itemCoord[1], itemCoord[2], 20, 20)
     end
 
+    -- draw keys 
+
     love.graphics.setColor(1,1,0)
     for _, keyCoord in ipairs(keys) do
         love.graphics.rectangle("fill", keyCoord[1], keyCoord[2], 20, 20)
     end
 
+    -- draw player character
+
     love.graphics.setColor(0,1,0)
     love.graphics.rectangle("fill", playerCoord[1], playerCoord[2], 20, 20)
+    -- love.graphics.draw(playerSprite, playerCoord[1], playerCoord[2])
 
 end
