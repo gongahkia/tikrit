@@ -637,6 +637,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 -- further spruce up the lose screen later
     if not player.alive then
         serialize(string.format("map/%s.txt",player.currRoom))
+        love.audio.stop(playerWalkingSound)
         love.audio.stop(ambientNoiseSound)
         -- love.event.quit()
     end
@@ -647,8 +648,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 -- further spruce up the win screen later
     if player.overallKeyCount == keys.globalCount and player.alive then
         serialize(string.format("map/%s.txt",player.currRoom))
+        love.audio.stop(playerWalkingSound)
         love.audio.stop(ambientNoiseSound)
-        -- love.event.quit()
+        love.event.quit()
     end 
 
 -- ---------- PLAYER MOVE DIFFERENT ROOM ----------
@@ -721,6 +723,17 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             player.coord[1] = player.coord[1] - (dt * player.speed)
         elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
             player.coord[1] = player.coord[1] + (dt * player.speed)
+        end
+
+        if love.keyboard.isDown("w", "up", "s", "down", "a", "left", "d", "right") then
+            if not playerWalkingSound:isPlaying() then
+                love.audio.play(playerWalkingSound)
+                playerWalkingSound:setLooping(true)
+            end
+        else
+            if playerWalkingSound:isPlaying() then
+                love.audio.stop(playerWalkingSound)
+            end
         end
 
     -- ---------- COLLISION ----------
