@@ -2,8 +2,7 @@
 
 -- immediate
     -- add sprites for opening chest
-    -- add sprites for opening doors => determine for each room which doors there are, and below those doors dont paint wall, paint open door
-    -- work out what to draw on top of what in the love.draw() loop to ensure things render accordingly
+        -- work out what to draw on top of what in the love.draw() loop to ensure things render accordingly
     -- work on win and lose condition => copy win condition for what i did for lose condition
     -- add a function outside of the love.draw() loop that determines the randomised floor tiling between floor-stone-1 and 2 for each room, and feeds that input into the floor drawing portion of the love.draw() function and does this for every room in roomList
     -- do the same thing for the walls => this might be a bit hard, see how
@@ -35,7 +34,7 @@
 
 -- ---------- PRESETS ----------
 
--- local inspect = require("inspect")
+local inspect = require("inspect")
 
 local elapsedTime = 0
 
@@ -117,6 +116,14 @@ function split(str, delimiter)
     end
     tem = tem:gsub("\r$", "")
     table.insert(fin,tem)
+    return fin
+end
+
+function shallowCopy(og) 
+    local fin = {}
+    for key, value in ipairs(og) do
+        fin[key] = value
+    end
     return fin
 end
 
@@ -523,12 +530,14 @@ function love.load() -- load function that runs once at the beginning
     world.player.coord = playerRoomCoord[2]
     deserialize(string.format("map/%s.txt", playerRoomCoord[1]))
     doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
+    openedDoorSpriteCoords = shallowCopy(doorList)
     addDoorAsWall(world,doorList)
     world.door.coord = doorList
 
     -- print(inspect(worldMap))
     -- print(totalKeys(worldMap))
     -- print(inspect(validStartingRoomAndCoord(worldMap)))
+    -- print(inspect(openedDoorSpriteCoords))
 
     -- SPRITE LOADING
 
@@ -599,6 +608,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         player.coord = playerLoc[2] -- new player location
 
         doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
+        openedDoorSpriteCoords = shallowCopy(doorList)
         addDoorAsWall(world,doorList)
         if world.key.totalCount ~= 0 then
             world.door.coord = doorList
@@ -772,6 +782,10 @@ function love.draw() -- draw function that runs once every frame
     love.graphics.draw(bottomRightBorderSprite, 580, 580)
 
     -- DRAW DOORS
+
+    for _, openedDoorCoord in ipairs(openedDoorSpriteCoords) do
+        love.graphics.draw(openedDoorSprite, openedDoorCoord[1], openedDoorCoord[2])
+    end
 
     -- love.graphics.setColor(1, 0.5, 0.5)
     for _, doorCoord in ipairs(doors) do
