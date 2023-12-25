@@ -1,7 +1,6 @@
 -- FUA
 
 -- immediate
-    -- add ambient noise for walking
     -- add sprites for opening chest
         -- work out what to draw on top of what in the love.draw() loop to ensure things render accordingly
     -- work on win and lose condition => copy win condition for what i did for lose condition
@@ -21,7 +20,6 @@
             -- implement seperate path finding algorithm that is easier than astar to reduce loading time
             -- https://youtu.be/rbYxbIMOZkE?si=OaYR9GwL9hIovhGO
         -- work out how to slow down monster movement
-        -- taking speed boost increases your speed but also the sound of your steps, which attracts monsters to your location
         -- implement state machine for monsters similar to this enemy ai (https://youtu.be/LojAdI4eQsM?si=xFz7FxsnvlLw8fDM)
         -- implement mutliple monsters
     -- implement a function that checks if a room only has one connection, if so, then it removes all key drops since those are unnecessary and replaces them with something else
