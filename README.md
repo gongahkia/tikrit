@@ -2,9 +2,6 @@
 
 ![](asset/tikrit-origin.png)
 
-Sprites from Kenney's [tiny dungeon](https://kenney.nl/assets/tiny-dungeon) asset pack.
-Audio from [OpenGameArt](https://opengameart.org/).
-
 ## Installation
 
 ```console
@@ -18,3 +15,8 @@ $ ./install.sh
 ```console
 $ make # builds executable
 ```
+
+## Assets
+
+* Sprites from Kenney's [tiny dungeon](https://kenney.nl/assets/tiny-dungeon) asset pack
+* Audio from [OpenGameArt](https://opengameart.org/)
