@@ -1,7 +1,5 @@
 -- FUA
-
     -- Immediate
-        -- serialize the enemy locations to nearest point
         -- work on win and lose condition => copy win condition for what i did for lose condition, add a winning sound effect and screen of other sprites cheering for you like the shinji in a chair scene?
         -- add a quick time event when a player is caught by a ghost that gives them a chance of escaping death by beating a minigame, add a few different minigames w interesting inputs, and let ghosts track ur location only when u make noise by picking up items or keys or when running
         -- randomise key locations and spawn points for certain items in each room
@@ -27,7 +25,7 @@
 
 -- ---------- PRESETS ----------
 
-local inspect = require("inspect")
+-- local inspect = require("inspect")
 
 local elapsedTime = 0
 
