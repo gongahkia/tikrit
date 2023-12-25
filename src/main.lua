@@ -1,19 +1,13 @@
 -- FUA
 
 -- immediate
-    -- add sprites for opening chest
-        -- work out what to draw on top of what in the love.draw() loop to ensure things render accordingly
-    -- work on win and lose condition => copy win condition for what i did for lose condition
-    -- might want to consider reworking loop in love.load() to first load layout map succesfully before opening window, can print debug info to stdout while the layout is still loading, perhaps display every possible configuration
-    -- shaders for love2d!!!
-    -- randomise key locations and spawn points for certain items in each room
-    -- add title screen, cutscenes, game over screen
+    -- implement shaders for love2d and limited light
     -- figure out how to implement dithering for light surrounding the player
+    -- add title screen, cutscenes, game over screen
+    -- work in UI that shows the number of keys collected and a minimap(?) that shows rooms covered
+    -- work on win and lose condition => copy win condition for what i did for lose condition, add a winning sound effect and screen of other sprites cheering for you like the shinji in a chair scene?
+    -- randomise key locations and spawn points for certain items in each room
     -- integrate make file commands into main program loop
-    -- graphics
-        -- import sprites
-        -- animation for sprites
-        -- import background sprites to be painted below every other layer in the love.draw() function
     -- continue testing room rendering logic
     -- monster logic
         -- perhaps consider making enemies ghosts that can ignore walls or implement different behaviour that circumvents the path-finding issue, maybe ghosts can just go through walls LOL
@@ -578,7 +572,7 @@ function love.load() -- load function that runs once at the beginning
     -- print(inspect(validStartingRoomAndCoord(worldMap)))
     -- print(inspect(openedDoorSpriteCoords))
 
-    -- SPRITE LOADING
+    -- ---------- SPRITE LOADING ------------
 
     playerSprite = love.graphics.newImage("sprite/player-default.png")
     deadPlayerSprite = love.graphics.newImage("sprite/player-tombstone.png")
@@ -603,7 +597,7 @@ function love.load() -- load function that runs once at the beginning
     wallSprite2 = love.graphics.newImage("sprite/dirt-wall-2.png")
     wallSprite3 = love.graphics.newImage("sprite/dirt-wall-3.png")
 
-    -- SOUND LOADING
+    -- ---------- SOUND LOADING ----------
 
     ambientNoiseSound = love.audio.newSource("sound/ambient-background.mp3", "stream")
     playerWalkingSound = love.audio.newSource("sound/player-walking.mp3", "static")
@@ -810,6 +804,10 @@ function love.draw() -- draw function that runs once every frame
     keys = world.key.coord
 
     love.graphics.clear()
+
+    -- SETS SHADERS
+
+    love.graphics.setColor(0.5, 0.5, 0.5, 1) -- gives me the same effect of shaders without actually adding shaders, makes screen darker by adding a gray overlay over all sprites
 
     -- DRAW FLOOR TILESET; everything else is drawn over this
 
