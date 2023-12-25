@@ -1,7 +1,7 @@
 -- FUA
 
 -- immediate
-    -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
+    -- add ambient noise for walking
     -- add sprites for opening chest
         -- work out what to draw on top of what in the love.draw() loop to ensure things render accordingly
     -- work on win and lose condition => copy win condition for what i did for lose condition
@@ -605,7 +605,20 @@ function love.load() -- load function that runs once at the beginning
     wallSprite2 = love.graphics.newImage("sprite/dirt-wall-2.png")
     wallSprite3 = love.graphics.newImage("sprite/dirt-wall-3.png")
 
-    -- print(love.filesystem.getWorkingDirectory())
+    -- SOUND LOADING
+
+    ambientNoiseSound = love.audio.newSource("sound/ambient-background.mp3", "stream")
+    playerWalkingSound = love.audio.newSource("sound/player-walking.mp3", "static")
+    playerDeathSound = love.audio.newSource("sound/player-death.mp3", "static")
+    playerTombstoneSound = love.audio.newSource("sound/player-lose-screen.mp3", "static")
+    playerItemSound = love.audio.newSource("sound/player-collect-item.mp3", "static")
+    playerKeySound = love.audio.newSource("sound/player-collect-key.mp3", "static")
+    playerEquipArmourSound = love.audio.newSource("sound/player-equip.mp3", "static")
+    doorOpenSound = love.audio.newSource("sound/door-open.mp3", "static")
+    ghostScreamSound = love.audio.newSource("sound/ghost-scream.mp3", "static")
+
+    ambientNoiseSound:setLooping(true)
+    love.audio.play(ambientNoiseSound)
 
 end
 
@@ -624,6 +637,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 -- further spruce up the lose screen later
     if not player.alive then
         serialize(string.format("map/%s.txt",player.currRoom))
+        love.audio.stop(ambientNoiseSound)
         -- love.event.quit()
     end
 
@@ -633,7 +647,8 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 -- further spruce up the win screen later
     if player.overallKeyCount == keys.globalCount and player.alive then
         serialize(string.format("map/%s.txt",player.currRoom))
-        love.event.quit()
+        love.audio.stop(ambientNoiseSound)
+        -- love.event.quit()
     end 
 
 -- ---------- PLAYER MOVE DIFFERENT ROOM ----------
@@ -733,6 +748,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 player.coord[1], player.coord[2] = storedX, storedY
                 player.alive = false
                 print("player died")
+                love.audio.play(playerDeathSound)
                 -- love.event.quit()
             end
         end
@@ -744,6 +760,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 player.speed = player.speed + items.buffSpeed
                 table.remove(items.coord, i)
                 print("item picked up, player speed increased" , player.speed)
+                love.audio.play(playerItemSound)
             end
         end
 
@@ -756,9 +773,11 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 player.keyCount = player.keyCount + 1
                 player.overallKeyCount = player.overallKeyCount + 1
                 print("key picked up", player.keyCount)
+                love.audio.play(playerKeySound)
 
                 if player.keyCount == keys.totalCount then
                     print("all keys collected, opening doors")
+                    love.audio.play(doorOpenSound)
                     doors.coord = {}
                 end
 
