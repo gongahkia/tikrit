@@ -1,12 +1,10 @@
 -- FUA
 
 -- immediate
+    -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
     -- add sprites for opening chest
         -- work out what to draw on top of what in the love.draw() loop to ensure things render accordingly
     -- work on win and lose condition => copy win condition for what i did for lose condition
-    -- add a function outside of the love.draw() loop that determines the randomised floor tiling between floor-stone-1 and 2 for each room, and feeds that input into the floor drawing portion of the love.draw() function and does this for every room in roomList
-    -- add a function for the love.draw() loop that determines the randomised floor tiling of each room do the same thing for the walls => this might be a bit hard, see how
-    -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
     -- might want to consider reworking loop in love.load() to first load layout map succesfully before opening window, can print debug info to stdout while the layout is still loading, perhaps display every possible configuration
     -- shaders for love2d!!!
     -- randomise key locations and spawn points for certain items in each room
@@ -515,6 +513,48 @@ function validStartingRoomAndCoord(worldMap)
     end
 end
 
+function randomFloor(worldMap)
+    math.randomseed(os.time())
+    fin = {}
+    for _, el in ipairs(worldMap) do
+        tem = {}
+        for y = 20, 580, 20 do
+            for x = 20, 580, 20 do
+                local i = math.random(1, 2)
+                if i == 1 then 
+                    table.insert(tem,{{x,y},1})
+                elseif i == 2 then
+                    table.insert(tem,{{x,y},2})
+                end
+            end
+        end
+        table.insert(fin,{el[1], tem})
+    end
+    return fin
+end
+
+function randomWall(worldMap)
+    math.randomseed(os.time())
+    fin = {}
+    for _, el in ipairs(worldMap) do
+        tem = {}
+        for y = 20, 580, 20 do
+            for x = 20, 580, 20 do
+                local i = math.random(1, 3)
+                if i == 1 then 
+                    table.insert(tem,{{x,y},1})
+                elseif i == 2 then
+                    table.insert(tem,{{x,y},2})
+                elseif i == 3 then
+                    table.insert(tem,{{x,y},3})
+                end
+            end
+        end
+        table.insert(fin,{el[1], tem})
+    end
+    return fin
+end
+
 -- ---------- EVENT LOOP ----------
 
 function love.load() -- load function that runs once at the beginning
@@ -525,6 +565,8 @@ function love.load() -- load function that runs once at the beginning
     worldMap = generateMap("map/layout.txt")
     world.key.globalCount = totalKeys(worldMap)
     playerRoomCoord = validStartingRoomAndCoord(worldMap)
+    randomFloorMap = randomFloor(worldMap)
+    randomWallMap = randomWall(worldMap)
     world.player.currRoom = playerRoomCoord[1]
     world.player.coord = playerRoomCoord[2]
     deserialize(string.format("map/%s.txt", playerRoomCoord[1]))
@@ -533,7 +575,7 @@ function love.load() -- load function that runs once at the beginning
     addDoorAsWall(world,doorList)
     world.door.coord = doorList
 
-    -- print(inspect(worldMap))
+    print(inspect(worldMap))
     -- print(totalKeys(worldMap))
     -- print(inspect(validStartingRoomAndCoord(worldMap)))
     -- print(inspect(openedDoorSpriteCoords))
@@ -741,9 +783,15 @@ function love.draw() -- draw function that runs once every frame
 
     -- DRAW FLOOR TILESET; everything else is drawn over this
 
-    for y = 20, 580, 20 do
-        for x = 20, 580, 20 do
-            love.graphics.draw(floorSprite1, x, y)
+    for _,val in ipairs(randomFloorMap) do
+        if val[1] == world.player.currRoom then
+            for _,el in ipairs(val[2]) do
+                if el[2] == 1 then
+                    love.graphics.draw(floorSprite1, el[1][1], el[1][2])
+                elseif el[2] == 2 then
+                    love.graphics.draw(floorSprite2, el[1][1], el[1][2])
+                end
+            end
         end
     end
 
@@ -752,11 +800,29 @@ function love.draw() -- draw function that runs once every frame
 
     -- DRAW WALLS
 
+    for _, val in ipairs(randomWallMap) do
+        if val[1] == world.player.currRoom then
+            for _, el in ipairs(val[2]) do
+                if inside(el[1], world.wall.coord) then
+                    if el[2] == 1 then
+                        love.graphics.draw(wallSprite1, el[1][1], el[1][2])
+                    elseif el[2] == 2 then
+                        love.graphics.draw(wallSprite2, el[1][1], el[1][2])
+                    elseif el[2] == 3 then
+                        love.graphics.draw(wallSprite3, el[1][1], el[1][2])
+                    end
+                end
+            end
+        end
+    end
+
+    --[[
     -- love.graphics.setColor(1,1,1)
     for _, wallCoord in ipairs(walls) do
         love.graphics.draw(wallSprite1, wallCoord[1], wallCoord[2])
         -- love.graphics.rectangle("fill", wallCoord[1], wallCoord[2], 20, 20)
     end 
+    ]]--
 
     -- DRAW BORDERS OF SCREEN
 
