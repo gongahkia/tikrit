@@ -1,25 +1,29 @@
 -- FUA
 
--- immediate
-    -- implement shaders for love2d and limited light
-    -- figure out how to implement dithering for light surrounding the player
-    -- add title screen, cutscenes, game over screen
-    -- work in UI that shows the number of keys collected and a minimap(?) that shows rooms covered
-    -- work on win and lose condition => copy win condition for what i did for lose condition, add a winning sound effect and screen of other sprites cheering for you like the shinji in a chair scene?
-    -- randomise key locations and spawn points for certain items in each room
-    -- integrate make file commands into main program loop
-    -- continue testing room rendering logic
-    -- monster logic
-        -- perhaps consider making enemies ghosts that can ignore walls or implement different behaviour that circumvents the path-finding issue, maybe ghosts can just go through walls LOL
-            -- implement seperate path finding algorithm that is easier than astar to reduce loading time
-            -- https://youtu.be/rbYxbIMOZkE?si=OaYR9GwL9hIovhGO
-        -- work out how to slow down monster movement
-        -- implement state machine for monsters similar to this enemy ai (https://youtu.be/LojAdI4eQsM?si=xFz7FxsnvlLw8fDM)
-        -- implement mutliple monsters
-    -- implement a function that checks if a room only has one connection, if so, then it removes all key drops since those are unnecessary and replaces them with something else
-    -- check installation on different platforms (OSX, Windows, Linux)
-    -- add logic for variations of player character who can move faster, teleport and other upgrades
-    -- add sprites for other characters and shop keeper and ranged attacks from Kenny's tiny dungeon art pack
+    -- Immediate
+        -- serialize the enemy locations to nearest point
+        -- work on win and lose condition => copy win condition for what i did for lose condition, add a winning sound effect and screen of other sprites cheering for you like the shinji in a chair scene?
+        -- add a quick time event when a player is caught by a ghost that gives them a chance of escaping death by beating a minigame, add a few different minigames w interesting inputs, and let ghosts track ur location only when u make noise by picking up items or keys or when running
+        -- randomise key locations and spawn points for certain items in each room
+    -- Graphics and Sound
+        -- make the walking sound louder when running after consuming a potion
+        -- implement limited light and VHS and shadow shaders in love2d
+    -- UI
+        -- add title screen, cutscenes, game over screen
+        -- work in UI that shows the number of keys collected and a minimap(?) that shows rooms covered
+        -- rework the screen to be 800 by 600, so there is vertical space on either side of the 600 by 600 grid, UI can be space on the side of the screen 
+        -- during boss fight, the sidebars and UI disappear and the game shows a 800 by 600 full view window for a large arena
+        -- OR have UI just be floating text sprites that fade away after a while; implement a system to achieve this
+    -- Boss fight
+        -- ensure complete integration with existing systems
+        -- 3 phase boss battle
+        -- fresh room design
+        -- different attack patterns
+    -- Misc
+        -- check installation on different platforms (OSX, Windows, Linux)
+        -- integrate make file commands into main program loop
+        -- add a speed run option w a random seed taken in as input for room generation of layout.txt map file
+        -- continue testing room rendering logic
 
 -- ---------- PRESETS ----------
 
@@ -40,7 +44,7 @@ local world = {
 
     monster = {
         coord = {},
-        speed = 150,
+        speed = 50,
     },
 
     wall = {
@@ -265,7 +269,7 @@ function reset(tbl)
     tbl.player.keyCount = 0
     tbl.player.alive = true
     tbl.monster.coord = {}
-    tbl.monster.speed = 150
+    tbl.monster.speed = 50
     tbl.wall.coord = {}
     tbl.item.coord = {}
     tbl.item.buffSpeed = 200
@@ -547,6 +551,102 @@ function randomWall(worldMap)
     return fin
 end
 
+-- aggregates every other pixel to create a pixellated shader texture
+local pixelateShaderCode = [[
+    extern float pixelSize;
+
+    vec2 pixelate(vec2 uv, float pixelSize) {
+        return floor(uv / pixelSize) * pixelSize;
+    }
+
+    vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) {
+        vec2 pixelatedCoords = pixelate(texture_coords, pixelSize);
+        vec4 pixel = Texel(texture, pixelatedCoords);
+        return color * pixel;
+    }
+]]
+
+function assertTwenty(num)
+    if num % 20 == 0 then
+        return num
+    else
+        local fin = math.floor(num/20) * 20 + 20
+        return fin
+    end
+end
+
+function sanitiseMonsterCoord(earth)
+
+    math.randomseed(os.time())
+
+    fin = {}
+
+    for _,monsterCoord in ipairs(earth.monster.coord) do
+
+        i = math.random(1,2)
+        newMonsterCoord = {assertTwenty(monsterCoord[1]), assertTwenty(monsterCoord[2])}
+
+        -- overlap check
+        while inside(newMonsterCoord,earth.wall.coord) do
+            if i == 1 then
+                newMonsterCoord[1] = newMonsterCoord[1] + 20
+            elseif i == 2 then
+                newMonsterCoord[2] = newMonsterCoord[2] + 20
+            end
+        end
+
+        while inside(newMonsterCoord,earth.key.coord) do
+            if i == 1 then
+                newMonsterCoord[2] = newMonsterCoord[2] + 20
+            elseif i == 2 then
+                newMonsterCoord[1] = newMonsterCoord[1] + 20
+            end
+        end
+
+        while inside(newMonsterCoord,earth.item.coord) do
+            if i == 1 then
+                newMonsterCoord[1] = newMonsterCoord[1] + 20
+            elseif i == 2 then
+                newMonsterCoord[2] = newMonsterCoord[2] + 20
+            end
+        end
+
+        while inside(newMonsterCoord,earth.wall.coord) do
+            if i == 1 then
+                newMonsterCoord[1] = newMonsterCoord[1] + 20
+            elseif i == 2 then
+                newMonsterCoord[2] = newMonsterCoord[2] + 20
+            end
+        end
+
+        while inside(newMonsterCoord,fin) do
+            if i == 1 then
+                newMonsterCoord[1] = newMonsterCoord[1] + 20
+            elseif i == 2 then
+                newMonsterCoord[2] = newMonsterCoord[2] + 20
+            end
+        end
+
+        -- bounds check
+        if newMonsterCoord[1] < 20 then 
+            newMonsterCoord[1] = newMonsterCoord[1] + 20
+        end
+        if newMonsterCoord[2] < 20 then
+            newMonsterCoord[2] = newMonsterCoord[2] + 20
+        end
+        if newMonsterCoord[1] > 580 then
+            newMonsterCoord[1] = newMonsterCoord[1] - 20
+        end
+        if newMonsterCoord[2] > 580 then
+            newMonsterCoord[2] = newMonsterCoord[2] - 20
+        end
+
+        table.insert(fin,newMonsterCoord)
+    end
+    earth.monster.coord = fin
+    -- print("save these monster coords" .. inspect(fin))
+end
+
 -- ---------- EVENT LOOP ----------
 
 function love.load() -- load function that runs once at the beginning
@@ -567,7 +667,7 @@ function love.load() -- load function that runs once at the beginning
     addDoorAsWall(world,doorList)
     world.door.coord = doorList
 
-    print(inspect(worldMap))
+    -- print(inspect(worldMap))
     -- print(totalKeys(worldMap))
     -- print(inspect(validStartingRoomAndCoord(worldMap)))
     -- print(inspect(openedDoorSpriteCoords))
@@ -616,6 +716,10 @@ end
 
 function love.update(dt) -- update function that runs once every frame; dt is change in time and can be used for different tasks
 
+    math.randomseed(os.time())
+
+-- ---------- SCOPING ----------
+
     player = world.player
     monsters = world.monster
     walls = world.wall
@@ -650,6 +754,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     if checkPlayerOutBounds(player.coord) then -- player moves to different room, instantiate new room
 
         playerLoc = checkPlayerRoom(player.coord) 
+        sanitiseMonsterCoord(world)
         serialize(string.format("map/%s.txt",player.currRoom)) -- save past room data
         world = reset(world) -- resets world table data
         nextRoom = checkNextRoom(worldMap, player.currRoom, playerLoc[1])
@@ -686,9 +791,17 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
 -- ---------- ENTITY MOVEMENT -----------
 
--- FUA
--- add code here
 -- monster logic
+
+    for _, monsterCoord in ipairs(monsters.coord) do
+        local xOffset = player.coord[1] - monsterCoord[1]
+        local yOffset = player.coord[2] - monsterCoord[2]
+        local angle = math.atan2(yOffset, xOffset) -- angle offset between ghost and player
+        local dx = monsters.speed * math.cos(angle) -- ghost horizontal movement in x direction
+        local dy = monsters.speed * math.sin(angle) -- ghost vertical movement in y direction
+        monsterCoord[1] = monsterCoord[1] + (dt * dx) -- moves ghosts towards player
+        monsterCoord[2] = monsterCoord[2] + (dt * dy)
+    end
 
 -- player input
 
@@ -805,9 +918,9 @@ function love.draw() -- draw function that runs once every frame
 
     love.graphics.clear()
 
-    -- SETS SHADERS
+    -- SETS OVERLAYS AND SHADERS
 
-    love.graphics.setColor(0.5, 0.5, 0.5, 1) -- gives me the same effect of shaders without actually adding shaders, makes screen darker by adding a gray overlay over all sprites
+    love.graphics.setColor(0.5, 0.5, 0.5, 1) -- makes the screen darker by adding a gray overlay over all sprites
 
     -- DRAW FLOOR TILESET; everything else is drawn over this
 
@@ -889,10 +1002,14 @@ function love.draw() -- draw function that runs once every frame
     -- DRAW MONSTERS
 
     -- love.graphics.setColor(1,0,0)
-    for _, monsterCoord in ipairs(monsters) do
-        love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2])
-        -- love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
-    end 
+
+    if world.player.alive then 
+        for _, monsterCoord in ipairs(monsters) do
+            love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2])
+            -- love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
+        end 
+    else
+    end
 
     -- DRAW ITEM PICKUPS
 
