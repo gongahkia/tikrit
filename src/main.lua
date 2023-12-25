@@ -5,16 +5,13 @@
         -- work out what to draw on top of what in the love.draw() loop to ensure things render accordingly
     -- work on win and lose condition => copy win condition for what i did for lose condition
     -- add a function outside of the love.draw() loop that determines the randomised floor tiling between floor-stone-1 and 2 for each room, and feeds that input into the floor drawing portion of the love.draw() function and does this for every room in roomList
-    -- do the same thing for the walls => this might be a bit hard, see how
+    -- add a function for the love.draw() loop that determines the randomised floor tiling of each room do the same thing for the walls => this might be a bit hard, see how
+    -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
     -- might want to consider reworking loop in love.load() to first load layout map succesfully before opening window, can print debug info to stdout while the layout is still loading, perhaps display every possible configuration
-    -- add sprites for dead player that appears when player touches ghost
-    -- shaders for love2d?
-    -- add logic for variations of player character who can move faster, teleport and other upgrades
-    -- add sprites for other characters and shop keeper and ranged attacks from Kenny's tiny dungeon art pack
+    -- shaders for love2d!!!
     -- randomise key locations and spawn points for certain items in each room
     -- add title screen, cutscenes, game over screen
     -- figure out how to implement dithering for light surrounding the player
-    -- add ambient noise and sounds similar to this video (https://youtu.be/WAk6BzOKlzw?si=6nmL9BblVLtzDa63) for walking and unlocking to make game unnerving and for monsters
     -- integrate make file commands into main program loop
     -- graphics
         -- import sprites
@@ -31,6 +28,8 @@
         -- implement mutliple monsters
     -- implement a function that checks if a room only has one connection, if so, then it removes all key drops since those are unnecessary and replaces them with something else
     -- check installation on different platforms (OSX, Windows, Linux)
+    -- add logic for variations of player character who can move faster, teleport and other upgrades
+    -- add sprites for other characters and shop keeper and ranged attacks from Kenny's tiny dungeon art pack
 
 -- ---------- PRESETS ----------
 
