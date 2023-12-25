@@ -3,6 +3,7 @@
 ![](asset/tikrit-origin.png)
 
 Sprites from Kenney's [tiny dungeon](https://kenney.nl/assets/tiny-dungeon) asset pack.
+Audio from [OpenGameArt](https://opengameart.org/).
 
 ## Installation
 
