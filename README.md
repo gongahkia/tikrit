@@ -32,6 +32,8 @@ Collect the keys to escape.
 
 ![](asset/tikrit-gameplay-2.png)
 
+https://github.com/gongahkia/tikrit/assets/117062305/ef34901c-4873-4069-bbba-dda911497777
+
 ## Assets
 
 * Sprites from Kenney's [tiny dungeon](https://kenney.nl/assets/tiny-dungeon) asset pack
