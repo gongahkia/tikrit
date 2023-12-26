@@ -1,24 +1,12 @@
 -- FUA
     -- Immediate
-        -- add fairer spawning rules, prevent player from spawning in within 10 squares of a ghost
-        -- add sounds for ghost that start to play when they are within a certain spawning radius of the player
         -- work on win and lose condition => copy win condition for what i did for lose condition, add a winning sound effect and screen of other sprites cheering for you like the shinji in a chair scene?
-        -- add a quick time event when a player is caught by a ghost that gives them a chance of escaping death by beating a minigame, add a few different minigames w interesting inputs, and let ghosts track ur location only when u make noise by picking up items or keys or when running
-        -- randomise key locations and spawn points for certain items in each room
     -- Graphics and Sound
-        -- make the walking sound louder when running after consuming a potion
         -- implement limited light and VHS and shadow shaders in love2d
     -- UI
         -- add title screen, cutscenes, game over screen
+        -- add UI as floating text sprites that fade away after a while; implement a system to achieve this
         -- work in UI that shows the number of keys collected and a minimap(?) that shows rooms covered
-        -- rework the screen to be 800 by 600, so there is vertical space on either side of the 600 by 600 grid, UI can be space on the side of the screen 
-        -- during boss fight, the sidebars and UI disappear and the game shows a 800 by 600 full view window for a large arena
-        -- OR have UI just be floating text sprites that fade away after a while; implement a system to achieve this
-    -- Boss fight
-        -- ensure complete integration with existing systems
-        -- 3 phase boss battle
-        -- fresh room design
-        -- different attack patterns
     -- Misc
         -- check installation on different platforms (OSX, Windows, Linux)
         -- integrate make file commands into main program loop
@@ -27,7 +15,7 @@
 
 -- ---------- PRESETS ----------
 
--- local inspect = require("inspect")
+local inspect = require("inspect")
 
 local elapsedTime = 0
 
@@ -647,6 +635,24 @@ function sanitiseMonsterCoord(earth)
     -- print("save these monster coords" .. inspect(fin))
 end
 
+function manhattanDistance(playerCoord, monsterCoord)
+    return math.abs(monsterCoord[1] - playerCoord[1]) + math.abs(monsterCoord[2] - playerCoord[2])
+end
+
+function ghostProxCheck(playerCoord, monsterCoords)
+    local tem = {}
+    for _, monsterCoord in ipairs(monsterCoords) do
+        table.insert(tem, manhattanDistance(player.coord, monsterCoord))
+    end
+    for _, val in ipairs(tem) do
+        print(inspect(val))
+        if val <= 100 then
+            return true
+        end
+    end
+    return false
+end
+
 -- ---------- EVENT LOOP ----------
 
 function love.load() -- load function that runs once at the beginning
@@ -735,6 +741,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         serialize(string.format("map/%s.txt",player.currRoom))
         love.audio.stop(playerWalkingSound)
         love.audio.stop(ambientNoiseSound)
+        love.audio.stop(ghostScreamSound)
         -- love.event.quit()
     end
 
@@ -746,6 +753,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         serialize(string.format("map/%s.txt",player.currRoom))
         love.audio.stop(playerWalkingSound)
         love.audio.stop(ambientNoiseSound)
+        love.audio.stop(ghostScreamSound)
         love.event.quit()
     end 
 
@@ -791,7 +799,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
 -- ---------- ENTITY MOVEMENT -----------
 
--- monster logic
+-- MONSTER MOVEMENT
 
     for _, monsterCoord in ipairs(monsters.coord) do
         local xOffset = player.coord[1] - monsterCoord[1]
@@ -803,7 +811,21 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         monsterCoord[2] = monsterCoord[2] + (dt * dy)
     end
 
--- player input
+-- MONSTER PROXIMITY CHECK
+
+    if player.alive then
+        if ghostProxCheck(player.coord, monsters.coord) then
+            if not ghostScreamSound:isPlaying() then
+                love.audio.play(ghostScreamSound)
+            end
+        else
+            if ghostScreamSound:isPlaying() then
+                love.audio.stop(ghostScreamSound)
+            end
+        end
+    end
+
+-- PLAYER INPUT
 
     -- player escape screen
 
@@ -812,7 +834,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         print("event loop ended")
     end
 
-    -- player movement
+    -- PLAYER MOVEMENT
 
     if player.alive then
 
