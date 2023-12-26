@@ -2,7 +2,7 @@
 
 ![](asset/tikrit-origin.png)
 
-Tiny horror-ish roguelike written in Lua using Love2D over 5 days.
+Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in [Lua](https://www.lua.org/) using Love2D over 5 days.
 
 ## Installation
 
@@ -23,8 +23,6 @@ $ make reset # rebuild randomised level
 3. Install the [Love2D Support](https://marketplace.visualstudio.com/items?itemName=pixelbyte-studios.pixelbyte-love2d) VSCode extension.
 4. Open `src/main.lua` file.
 5. Press `alt + L` key
-
-> further installation methods WIP
 
 ## Screenshots
 
