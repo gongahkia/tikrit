@@ -1,13 +1,6 @@
--- FUA
-    -- Immediate
-        -- implement limited light and VHS and shadow shaders in love2d
-    -- Misc
-        -- check installation on different platforms (OSX, Windows, Linux)
-        -- integrate make file commands into main program loop
-
 -- ---------- PRESETS ----------
 
-local inspect = require("inspect")
+-- local inspect = require("inspect")
 
 local currentMode = "titleScreen"
 
@@ -1130,6 +1123,8 @@ function love.draw() -- draw function that runs once every frame
 
         -- love.graphics.setColor(0,1,0)
         -- love.graphics.rectangle("fill", playerCoord[1], playerCoord[2], 20, 20)
+
+        love.graphics.setShader()
 
     elseif currentMode == "winScreen" then
         drawWinScreen()

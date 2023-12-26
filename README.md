@@ -2,19 +2,37 @@
 
 ![](asset/tikrit-origin.png)
 
+Tiny horror-ish roguelike written in Lua using Love2D over 5 days.
+
 ## Installation
+
+### CLI
 
 ```console
 $ git clone 
 $ chmod +x install.sh
 $ ./install.sh
-```
-
-## Make
-
-```console
 $ make # builds executable
+$ make reset # rebuild randomised level
 ```
+
+### GUI
+
+1. Install [Love2D](https://love2d.org/).
+2. Open `tikrit` in VSCode.
+3. Install the [Love2D Support](https://marketplace.visualstudio.com/items?itemName=pixelbyte-studios.pixelbyte-love2d) VSCode extension.
+4. Open `src/main.lua` file.
+5. Press `alt + L` key
+
+> further installation methods WIP
+
+## Screenshots
+
+![](asset/tikrit-gameplay-1.png)
+
+Collect the keys to escape.
+
+![](asset/tikrit-gameplay-2.png)
 
 ## Assets
 
