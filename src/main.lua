@@ -1,21 +1,15 @@
 -- FUA
     -- Immediate
-        -- work on win and lose condition => copy win condition for what i did for lose condition, add a winning sound effect and screen of other sprites cheering for you like the shinji in a chair scene?
-    -- Graphics and Sound
         -- implement limited light and VHS and shadow shaders in love2d
-    -- UI
-        -- add title screen, cutscenes, game over screen
-        -- add UI as floating text sprites that fade away after a while; implement a system to achieve this
-        -- work in UI that shows the number of keys collected and a minimap(?) that shows rooms covered
     -- Misc
         -- check installation on different platforms (OSX, Windows, Linux)
         -- integrate make file commands into main program loop
-        -- add a speed run option w a random seed taken in as input for room generation of layout.txt map file
-        -- continue testing room rendering logic
 
 -- ---------- PRESETS ----------
 
 local inspect = require("inspect")
+
+local currentMode = "titleScreen"
 
 local elapsedTime = 0
 
@@ -645,12 +639,51 @@ function ghostProxCheck(playerCoord, monsterCoords)
         table.insert(tem, manhattanDistance(player.coord, monsterCoord))
     end
     for _, val in ipairs(tem) do
-        print(inspect(val))
         if val <= 100 then
             return true
         end
     end
     return false
+end
+
+-- FUA add and spruce up these screens
+function drawTitleScreen()
+    local text1 = "TIKRIT"
+    local text2 = "enter to start"
+    local text3 = "Made by @gongahkia on Github in Love2D"
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.setFont(AmaticFont80)
+    love.graphics.print("TIKRIT", (love.graphics.getWidth() - AmaticFont80:getWidth(text1))/2, (love.graphics.getHeight() - AmaticFont80:getHeight(text))/2 - 100)
+    love.graphics.setFont(AmaticFont40)
+    love.graphics.print("enter to start", (love.graphics.getWidth() - AmaticFont40:getWidth(text2))/2, 300)
+    love.graphics.setFont(AmaticFont25)
+    love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - AmaticFont25:getWidth(text3) - 10), (love.graphics.getHeight() - AmaticFont25:getHeight() - 10))
+end
+
+function drawLoseScreen()
+    local text1 = "Try again next time!"
+    local text2 = string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount)
+    local text3 = "Made by @gongahkia on Github in Love2D"
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.setFont(AmaticFont80)
+    love.graphics.print("Try again next time!", (love.graphics.getWidth() - AmaticFont80:getWidth(text1))/2, (love.graphics.getHeight() - AmaticFont80:getHeight(text))/2 - 100)
+    love.graphics.setFont(AmaticFont40)
+    love.graphics.print(string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount), (love.graphics.getWidth() - AmaticFont40:getWidth(text2))/2, 300)
+    love.graphics.setFont(AmaticFont25)
+    love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - AmaticFont25:getWidth(text3) - 10), (love.graphics.getHeight() - AmaticFont25:getHeight() - 10))
+end
+
+function drawWinScreen()
+    local text1 = "You Win!"
+    local text2 = string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount)
+    local text3 = "Made by @gongahkia on Github in Love2D"
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.setFont(AmaticFont80)
+    love.graphics.print("You Win!", (love.graphics.getWidth() - AmaticFont80:getWidth(text1))/2, (love.graphics.getHeight() - AmaticFont80:getHeight(text))/2 - 100)
+    love.graphics.setFont(AmaticFont40)
+    love.graphics.print(string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount), (love.graphics.getWidth() - AmaticFont40:getWidth(text2))/2, 300)
+    love.graphics.setFont(AmaticFont25)
+    love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - AmaticFont25:getWidth(text3) - 10), (love.graphics.getHeight() - AmaticFont25:getHeight() - 10))
 end
 
 -- ---------- EVENT LOOP ----------
@@ -715,6 +748,14 @@ function love.load() -- load function that runs once at the beginning
     doorOpenSound = love.audio.newSource("sound/door-open.mp3", "static")
     ghostScreamSound = love.audio.newSource("sound/ghost-scream.mp3", "static")
 
+    -- ---------- FONT LOADING ----------
+
+    AmaticFont80 = love.graphics.newFont("font/Amatic-Bold.ttf", 80)
+    AmaticFont40 = love.graphics.newFont("font/Amatic-Bold.ttf", 40)
+    AmaticFont25 = love.graphics.newFont("font/Amatic-Bold.ttf", 25)
+
+    -- ---------- LOADING IN PRESETS -----------
+
     ambientNoiseSound:setLooping(true)
     love.audio.play(ambientNoiseSound)
 
@@ -724,205 +765,229 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
     math.randomseed(os.time())
 
--- ---------- SCOPING ----------
+    if currentMode == "titleScreen" then
 
-    player = world.player
-    monsters = world.monster
-    walls = world.wall
-    doors = world.door
-    items = world.item
-    keys = world.key
-
--- ---------- LOSE CONDITION WHEN PLAYER DIES ----------
-
--- FUA
--- further spruce up the lose screen later
-    if not player.alive then
-        serialize(string.format("map/%s.txt",player.currRoom))
-        love.audio.stop(playerWalkingSound)
-        love.audio.stop(ambientNoiseSound)
-        love.audio.stop(ghostScreamSound)
-        -- love.event.quit()
-    end
-
--- ---------- WIN CONDITION WHEN ALL KEYS COLLECTED ----------
-
--- FUA
--- further spruce up the win screen later
-    if player.overallKeyCount == keys.globalCount and player.alive then
-        serialize(string.format("map/%s.txt",player.currRoom))
-        love.audio.stop(playerWalkingSound)
-        love.audio.stop(ambientNoiseSound)
-        love.audio.stop(ghostScreamSound)
-        love.event.quit()
-    end 
-
--- ---------- PLAYER MOVE DIFFERENT ROOM ----------
-
-    if checkPlayerOutBounds(player.coord) then -- player moves to different room, instantiate new room
-
-        playerLoc = checkPlayerRoom(player.coord) 
-        sanitiseMonsterCoord(world)
-        serialize(string.format("map/%s.txt",player.currRoom)) -- save past room data
-        world = reset(world) -- resets world table data
-        nextRoom = checkNextRoom(worldMap, player.currRoom, playerLoc[1])
-        deserialize(string.format("map/%s.txt",nextRoom)) -- load new room data
-        player.currRoom = nextRoom
-        player.coord = playerLoc[2] -- new player location
-
-        doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
-        openedDoorSpriteCoords = shallowCopy(doorList)
-        addDoorAsWall(world,doorList)
-        if world.key.totalCount ~= 0 then
-            world.door.coord = doorList
+        if love.keyboard.isDown("return") then
+            currentMode = "gameScreen"
         end
-        removeDoors(playerLoc[1]) -- removes door player entered from so player can be instantiated
 
-        -- print(inspect(playerLoc))
-        -- print("player moves to door" .. inspect(playerLoc[1]) .. " and new coord is " .. inspect(playerLoc[2]))
-        -- print("player now in" .. player.currRoom)
+    elseif currentMode == "gameScreen" then
 
-    end
+    -- ---------- SCOPING ----------
 
--- ---------- ITEM EFFECT TIMEOUT ----------
+        player = world.player
+        monsters = world.monster
+        walls = world.wall
+        doors = world.door
+        items = world.item
+        keys = world.key
 
-    if player.speed > 200 then
-        elapsedTime = elapsedTime + dt
-        if elapsedTime > 5 then
-            player.speed = player.speed - items.buffSpeed
-            elapsedTime = 0
-            print("item wore off, player speed", player.speed)
+    -- ---------- LOSE CONDITION WHEN PLAYER DIES ----------
+
+    -- FUA
+    -- further spruce up the lose screen later
+        if not player.alive then
+            serialize(string.format("map/%s.txt",player.currRoom))
+            love.audio.stop(playerWalkingSound)
+            love.audio.stop(ambientNoiseSound)
+            love.audio.stop(ghostScreamSound)
+            -- love.event.quit()
+            currentMode = "loseScreen"
         end
-    end
 
-    -- print(player.speed)
+    -- ---------- WIN CONDITION WHEN ALL KEYS COLLECTED ----------
 
--- ---------- ENTITY MOVEMENT -----------
+    -- FUA
+    -- further spruce up the win screen later
+        if player.overallKeyCount == keys.globalCount and player.alive then
+            serialize(string.format("map/%s.txt",player.currRoom))
+            love.audio.stop(playerWalkingSound)
+            love.audio.stop(ambientNoiseSound)
+            love.audio.stop(ghostScreamSound)
+            -- love.event.quit()
+            currentMode = "winScreen"
+        end 
 
--- MONSTER MOVEMENT
+    -- ---------- PLAYER MOVE DIFFERENT ROOM ----------
 
-    for _, monsterCoord in ipairs(monsters.coord) do
-        local xOffset = player.coord[1] - monsterCoord[1]
-        local yOffset = player.coord[2] - monsterCoord[2]
-        local angle = math.atan2(yOffset, xOffset) -- angle offset between ghost and player
-        local dx = monsters.speed * math.cos(angle) -- ghost horizontal movement in x direction
-        local dy = monsters.speed * math.sin(angle) -- ghost vertical movement in y direction
-        monsterCoord[1] = monsterCoord[1] + (dt * dx) -- moves ghosts towards player
-        monsterCoord[2] = monsterCoord[2] + (dt * dy)
-    end
+        if checkPlayerOutBounds(player.coord) then -- player moves to different room, instantiate new room
 
--- MONSTER PROXIMITY CHECK
+            playerLoc = checkPlayerRoom(player.coord) 
+            sanitiseMonsterCoord(world)
+            serialize(string.format("map/%s.txt",player.currRoom)) -- save past room data
+            world = reset(world) -- resets world table data
+            nextRoom = checkNextRoom(worldMap, player.currRoom, playerLoc[1])
+            deserialize(string.format("map/%s.txt",nextRoom)) -- load new room data
+            player.currRoom = nextRoom
+            player.coord = playerLoc[2] -- new player location
 
-    if player.alive then
-        if ghostProxCheck(player.coord, monsters.coord) then
-            if not ghostScreamSound:isPlaying() then
-                love.audio.play(ghostScreamSound)
+            doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
+            openedDoorSpriteCoords = shallowCopy(doorList)
+            addDoorAsWall(world,doorList)
+            if world.key.totalCount ~= 0 then
+                world.door.coord = doorList
             end
-        else
-            if ghostScreamSound:isPlaying() then
-                love.audio.stop(ghostScreamSound)
-            end
-        end
-    end
+            removeDoors(playerLoc[1]) -- removes door player entered from so player can be instantiated
 
--- PLAYER INPUT
+            -- print(inspect(playerLoc))
+            -- print("player moves to door" .. inspect(playerLoc[1]) .. " and new coord is " .. inspect(playerLoc[2]))
+            -- print("player now in" .. player.currRoom)
 
-    -- player escape screen
-
-    if love.keyboard.isDown("escape") then 
-        love.event.quit()
-        print("event loop ended")
-    end
-
-    -- PLAYER MOVEMENT
-
-    if player.alive then
-
-        storedX, storedY = player.coord[1], player.coord[2]
-
-        if love.keyboard.isDown("w") or love.keyboard.isDown("up") then 
-            player.coord[2] = player.coord[2] - (dt * player.speed)
-        elseif love.keyboard.isDown("s") or love.keyboard.isDown("down") then 
-            player.coord[2] = player.coord[2] + (dt * player.speed)
         end
 
-        if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
-            player.coord[1] = player.coord[1] - (dt * player.speed)
-        elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
-            player.coord[1] = player.coord[1] + (dt * player.speed)
-        end
+    -- ---------- ITEM EFFECT TIMEOUT ----------
 
-        if love.keyboard.isDown("w", "up", "s", "down", "a", "left", "d", "right") then
-            if not playerWalkingSound:isPlaying() then
-                love.audio.play(playerWalkingSound)
-                playerWalkingSound:setLooping(true)
-            end
-        else
-            if playerWalkingSound:isPlaying() then
-                love.audio.stop(playerWalkingSound)
+        if player.speed > 200 then
+            elapsedTime = elapsedTime + dt
+            if elapsedTime > 5 then
+                player.speed = player.speed - items.buffSpeed
+                elapsedTime = 0
+                print("item wore off, player speed", player.speed)
             end
         end
 
-    -- ---------- COLLISION ----------
+        -- print(player.speed)
 
-    -- player and wall
+    -- ---------- ENTITY MOVEMENT -----------
 
-        for _, wallCoord in ipairs(walls.coord) do
-            if checkCollision(wallCoord, player.coord) then
-                player.coord[1], player.coord[2] = storedX, storedY         
-            end
-        end
-
-    -- player and door
-
-        for _, doorCoord in ipairs(doors.coord) do
-            if checkCollision(doorCoord, player.coord) then
-                player.coord[1], player.coord[2] = storedX, storedY 
-            end
-        end
-
-    -- player and monster
+    -- MONSTER MOVEMENT
 
         for _, monsterCoord in ipairs(monsters.coord) do
-            if checkCollision(monsterCoord, player.coord) then
-                player.coord[1], player.coord[2] = storedX, storedY
-                player.alive = false
-                print("player died")
-                love.audio.play(playerDeathSound)
-                -- love.event.quit()
-            end
+            local xOffset = player.coord[1] - monsterCoord[1]
+            local yOffset = player.coord[2] - monsterCoord[2]
+            local angle = math.atan2(yOffset, xOffset) -- angle offset between ghost and player
+            local dx = monsters.speed * math.cos(angle) -- ghost horizontal movement in x direction
+            local dy = monsters.speed * math.sin(angle) -- ghost vertical movement in y direction
+            monsterCoord[1] = monsterCoord[1] + (dt * dx) -- moves ghosts towards player
+            monsterCoord[2] = monsterCoord[2] + (dt * dy)
         end
 
-    -- player and item
+    -- MONSTER PROXIMITY CHECK
 
-        for i, itemCoord in ipairs(items.coord) do 
-            if checkCollision(itemCoord, player.coord) then
-                player.speed = player.speed + items.buffSpeed
-                table.remove(items.coord, i)
-                print("item picked up, player speed increased" , player.speed)
-                love.audio.play(playerItemSound)
-            end
-        end
-
-    -- player and key
-
-        for q, keyCoord in ipairs(keys.coord) do
-            if checkCollision(keyCoord, player.coord) then
-
-                table.remove(keys.coord, q)
-                player.keyCount = player.keyCount + 1
-                player.overallKeyCount = player.overallKeyCount + 1
-                print("key picked up", player.keyCount)
-                love.audio.play(playerKeySound)
-
-                if player.keyCount == keys.totalCount then
-                    print("all keys collected, opening doors")
-                    love.audio.play(doorOpenSound)
-                    doors.coord = {}
+        if player.alive then
+            if ghostProxCheck(player.coord, monsters.coord) then
+                if not ghostScreamSound:isPlaying() then
+                    love.audio.play(ghostScreamSound)
                 end
-
+            else
+                if ghostScreamSound:isPlaying() then
+                    love.audio.stop(ghostScreamSound)
+                end
             end
         end
+
+    -- PLAYER INPUT
+
+        -- player escape screen
+
+        if love.keyboard.isDown("escape") then 
+            love.event.quit()
+            print("event loop ended")
+        end
+
+        -- PLAYER MOVEMENT
+
+        if player.alive then
+
+            storedX, storedY = player.coord[1], player.coord[2]
+
+            if love.keyboard.isDown("w") or love.keyboard.isDown("up") then 
+                player.coord[2] = player.coord[2] - (dt * player.speed)
+            elseif love.keyboard.isDown("s") or love.keyboard.isDown("down") then 
+                player.coord[2] = player.coord[2] + (dt * player.speed)
+            end
+
+            if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
+                player.coord[1] = player.coord[1] - (dt * player.speed)
+            elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
+                player.coord[1] = player.coord[1] + (dt * player.speed)
+            end
+
+            if love.keyboard.isDown("w", "up", "s", "down", "a", "left", "d", "right") then
+                if not playerWalkingSound:isPlaying() then
+                    love.audio.play(playerWalkingSound)
+                    playerWalkingSound:setLooping(true)
+                end
+            else
+                if playerWalkingSound:isPlaying() then
+                    love.audio.stop(playerWalkingSound)
+                end
+            end
+
+        -- ---------- COLLISION ----------
+
+        -- player and wall
+
+            for _, wallCoord in ipairs(walls.coord) do
+                if checkCollision(wallCoord, player.coord) then
+                    player.coord[1], player.coord[2] = storedX, storedY         
+                end
+            end
+
+        -- player and door
+
+            for _, doorCoord in ipairs(doors.coord) do
+                if checkCollision(doorCoord, player.coord) then
+                    player.coord[1], player.coord[2] = storedX, storedY 
+                end
+            end
+
+        -- player and monster
+
+            for _, monsterCoord in ipairs(monsters.coord) do
+                if checkCollision(monsterCoord, player.coord) then
+                    player.coord[1], player.coord[2] = storedX, storedY
+                    player.alive = false
+                    print("player died")
+                    love.audio.play(playerDeathSound)
+                    -- love.event.quit()
+                end
+            end
+
+        -- player and item
+
+            for i, itemCoord in ipairs(items.coord) do 
+                if checkCollision(itemCoord, player.coord) then
+                    player.speed = player.speed + items.buffSpeed
+                    table.remove(items.coord, i)
+                    print("item picked up, player speed increased" , player.speed)
+                    love.audio.play(playerItemSound)
+                end
+            end
+
+        -- player and key
+
+            for q, keyCoord in ipairs(keys.coord) do
+                if checkCollision(keyCoord, player.coord) then
+
+                    table.remove(keys.coord, q)
+                    player.keyCount = player.keyCount + 1
+                    player.overallKeyCount = player.overallKeyCount + 1
+                    print("key picked up", player.keyCount)
+                    love.audio.play(playerKeySound)
+
+                    if player.keyCount == keys.totalCount then
+                        print("all keys collected, opening doors")
+                        love.audio.play(doorOpenSound)
+                        doors.coord = {}
+                    end
+
+                end
+            end
+        end
+
+    elseif currentMode == "winScreen" then
+
+        if love.keyboard.isDown("return") or love.keyboard.isDown("escape") then
+            love.event.quit()
+        end
+
+    elseif currentMode  == "loseScreen" then
+        
+        if love.keyboard.isDown("return") or love.keyboard.isDown("escape") then
+            love.event.quit()
+        end
+
     end
 
 end
@@ -931,133 +996,142 @@ function love.draw() -- draw function that runs once every frame
 
     math.randomseed(os.time())
 
-    playerCoord = world.player.coord
-    monsters = world.monster.coord
-    walls = world.wall.coord
-    doors = world.door.coord
-    items = world.item.coord
-    keys = world.key.coord
+    if currentMode == "titleScreen" then
+        drawTitleScreen()
+    elseif currentMode == "gameScreen" then -- draw game
 
-    love.graphics.clear()
+        playerCoord = world.player.coord
+        monsters = world.monster.coord
+        walls = world.wall.coord
+        doors = world.door.coord
+        items = world.item.coord
+        keys = world.key.coord
 
-    -- SETS OVERLAYS AND SHADERS
+        love.graphics.clear()
 
-    love.graphics.setColor(0.5, 0.5, 0.5, 1) -- makes the screen darker by adding a gray overlay over all sprites
+        -- SETS OVERLAYS AND SHADERS
 
-    -- DRAW FLOOR TILESET; everything else is drawn over this
+        love.graphics.setColor(0.5, 0.5, 0.5, 1) -- makes the screen darker by adding a gray overlay over all sprites
 
-    for _,val in ipairs(randomFloorMap) do
-        if val[1] == world.player.currRoom then
-            for _,el in ipairs(val[2]) do
-                if el[2] == 1 then
-                    love.graphics.draw(floorSprite1, el[1][1], el[1][2])
-                elseif el[2] == 2 then
-                    love.graphics.draw(floorSprite2, el[1][1], el[1][2])
-                end
-            end
-        end
-    end
+        -- DRAW FLOOR TILESET; everything else is drawn over this
 
-    -- love.graphics.setColor(173/255, 216/255, 230/255, 1)
-    -- love.graphics.rectangle("fill",0,0,600,600)
-
-    -- DRAW WALLS
-
-    for _, val in ipairs(randomWallMap) do
-        if val[1] == world.player.currRoom then
-            for _, el in ipairs(val[2]) do
-                if inside(el[1], world.wall.coord) then
+        for _,val in ipairs(randomFloorMap) do
+            if val[1] == world.player.currRoom then
+                for _,el in ipairs(val[2]) do
                     if el[2] == 1 then
-                        love.graphics.draw(wallSprite1, el[1][1], el[1][2])
+                        love.graphics.draw(floorSprite1, el[1][1], el[1][2])
                     elseif el[2] == 2 then
-                        love.graphics.draw(wallSprite2, el[1][1], el[1][2])
-                    elseif el[2] == 3 then
-                        love.graphics.draw(wallSprite3, el[1][1], el[1][2])
+                        love.graphics.draw(floorSprite2, el[1][1], el[1][2])
                     end
                 end
             end
         end
-    end
 
-    --[[
-    -- love.graphics.setColor(1,1,1)
-    for _, wallCoord in ipairs(walls) do
-        love.graphics.draw(wallSprite1, wallCoord[1], wallCoord[2])
-        -- love.graphics.rectangle("fill", wallCoord[1], wallCoord[2], 20, 20)
-    end 
-    ]]--
+        -- love.graphics.setColor(173/255, 216/255, 230/255, 1)
+        -- love.graphics.rectangle("fill",0,0,600,600)
 
-    -- DRAW BORDERS OF SCREEN
+        -- DRAW WALLS
 
-    for y = 0, 580, 20 do
-        for x = 0, 580, 20 do
-            if y == 0 then 
-                love.graphics.draw(topBorderSprite, x, y)
-            elseif y == 580 then
-                love.graphics.draw(bottomBorderSprite, x, y)
-            elseif x == 0 then
-                love.graphics.draw(middleLeftBorderSprite, x, y)
-            elseif x == 580 then
-                love.graphics.draw(middleRightBorderSprite, x, y)
-            else
-                -- do nothing if any other coordinate
+        for _, val in ipairs(randomWallMap) do
+            if val[1] == world.player.currRoom then
+                for _, el in ipairs(val[2]) do
+                    if inside(el[1], world.wall.coord) then
+                        if el[2] == 1 then
+                            love.graphics.draw(wallSprite1, el[1][1], el[1][2])
+                        elseif el[2] == 2 then
+                            love.graphics.draw(wallSprite2, el[1][1], el[1][2])
+                        elseif el[2] == 3 then
+                            love.graphics.draw(wallSprite3, el[1][1], el[1][2])
+                        end
+                    end
+                end
             end
         end
-    end
-    love.graphics.draw(topLeftBorderSprite, 0, 0)
-    love.graphics.draw(topRightBorderSprite, 580, 0)
-    love.graphics.draw(bottomLeftBorderSprite, 0, 580)
-    love.graphics.draw(bottomRightBorderSprite, 580, 580)
 
-    -- DRAW DOORS
-
-    for _, openedDoorCoord in ipairs(openedDoorSpriteCoords) do
-        love.graphics.draw(openedDoorSprite, openedDoorCoord[1], openedDoorCoord[2])
-    end
-
-    -- love.graphics.setColor(1, 0.5, 0.5)
-    for _, doorCoord in ipairs(doors) do
-        love.graphics.draw(closedDoorSprite, doorCoord[1], doorCoord[2])
-        -- love.graphics.rectangle("fill", doorCoord[1], doorCoord[2], 20, 20)
-    end
-
-    -- DRAW MONSTERS
-
-    -- love.graphics.setColor(1,0,0)
-
-    if world.player.alive then 
-        for _, monsterCoord in ipairs(monsters) do
-            love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2])
-            -- love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
+        --[[
+        -- love.graphics.setColor(1,1,1)
+        for _, wallCoord in ipairs(walls) do
+            love.graphics.draw(wallSprite1, wallCoord[1], wallCoord[2])
+            -- love.graphics.rectangle("fill", wallCoord[1], wallCoord[2], 20, 20)
         end 
-    else
+        ]]--
+
+        -- DRAW BORDERS OF SCREEN
+
+        for y = 0, 580, 20 do
+            for x = 0, 580, 20 do
+                if y == 0 then 
+                    love.graphics.draw(topBorderSprite, x, y)
+                elseif y == 580 then
+                    love.graphics.draw(bottomBorderSprite, x, y)
+                elseif x == 0 then
+                    love.graphics.draw(middleLeftBorderSprite, x, y)
+                elseif x == 580 then
+                    love.graphics.draw(middleRightBorderSprite, x, y)
+                else
+                    -- do nothing if any other coordinate
+                end
+            end
+        end
+        love.graphics.draw(topLeftBorderSprite, 0, 0)
+        love.graphics.draw(topRightBorderSprite, 580, 0)
+        love.graphics.draw(bottomLeftBorderSprite, 0, 580)
+        love.graphics.draw(bottomRightBorderSprite, 580, 580)
+
+        -- DRAW DOORS
+
+        for _, openedDoorCoord in ipairs(openedDoorSpriteCoords) do
+            love.graphics.draw(openedDoorSprite, openedDoorCoord[1], openedDoorCoord[2])
+        end
+
+        -- love.graphics.setColor(1, 0.5, 0.5)
+        for _, doorCoord in ipairs(doors) do
+            love.graphics.draw(closedDoorSprite, doorCoord[1], doorCoord[2])
+            -- love.graphics.rectangle("fill", doorCoord[1], doorCoord[2], 20, 20)
+        end
+
+        -- DRAW MONSTERS
+
+        -- love.graphics.setColor(1,0,0)
+
+        if world.player.alive then 
+            for _, monsterCoord in ipairs(monsters) do
+                love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2])
+                -- love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
+            end 
+        else
+        end
+
+        -- DRAW ITEM PICKUPS
+
+        -- love.graphics.setColor(0,0,1)
+        for _, itemCoord in ipairs(items) do
+            love.graphics.draw(itemSprite, itemCoord[1], itemCoord[2])
+            -- love.graphics.rectangle("fill", itemCoord[1], itemCoord[2], 20, 20)
+        end
+
+        -- DRAW KEYS
+
+        -- love.graphics.setColor(1,1,0)
+        for _, keyCoord in ipairs(keys) do
+            love.graphics.draw(closedChestSprite, keyCoord[1], keyCoord[2])
+            -- love.graphics.rectangle("fill", keyCoord[1], keyCoord[2], 20, 20)
+        end
+
+        -- DRAW PLAYER CHARACTER
+
+        if world.player.alive then
+            love.graphics.draw(playerSprite, playerCoord[1], playerCoord[2])
+        else
+            love.graphics.draw(deadPlayerSprite, playerCoord[1], playerCoord[2])
+        end
+
+        -- love.graphics.setColor(0,1,0)
+        -- love.graphics.rectangle("fill", playerCoord[1], playerCoord[2], 20, 20)
+
+    elseif currentMode == "winScreen" then
+        drawWinScreen()
+    elseif currentMode == "loseScreen" then
+        drawLoseScreen()
     end
-
-    -- DRAW ITEM PICKUPS
-
-    -- love.graphics.setColor(0,0,1)
-    for _, itemCoord in ipairs(items) do
-        love.graphics.draw(itemSprite, itemCoord[1], itemCoord[2])
-        -- love.graphics.rectangle("fill", itemCoord[1], itemCoord[2], 20, 20)
-    end
-
-    -- DRAW KEYS
-
-    -- love.graphics.setColor(1,1,0)
-    for _, keyCoord in ipairs(keys) do
-        love.graphics.draw(closedChestSprite, keyCoord[1], keyCoord[2])
-        -- love.graphics.rectangle("fill", keyCoord[1], keyCoord[2], 20, 20)
-    end
-
-    -- DRAW PLAYER CHARACTER
-
-    if world.player.alive then
-        love.graphics.draw(playerSprite, playerCoord[1], playerCoord[2])
-    else
-        love.graphics.draw(deadPlayerSprite, playerCoord[1], playerCoord[2])
-    end
-
-    -- love.graphics.setColor(0,1,0)
-    -- love.graphics.rectangle("fill", playerCoord[1], playerCoord[2], 20, 20)
-
 end
