@@ -769,6 +769,8 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
         if love.keyboard.isDown("return") then
             currentMode = "gameScreen"
+        elseif love.keyboard.isDown("escape") then
+            love.event.quit()
         end
 
     elseif currentMode == "gameScreen" then
