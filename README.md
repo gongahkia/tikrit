@@ -9,7 +9,7 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 ### CLI
 
 ```console
-$ git clone 
+$ git clone https://github.com/gongahkia/tikrit
 $ chmod +x install.sh
 $ ./install.sh
 $ make # builds executable
