@@ -1,6 +1,6 @@
 compiler := love
 
-all: build
+all: reset
 
 build: src
 	clear && love src
