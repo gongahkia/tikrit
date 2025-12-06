@@ -1,0 +1,814 @@
+# TIKRIT - IMPROVEMENT SUGGESTIONS
+# Generated after deep analysis of the codebase
+# Focus: Industry-relevant features, educational value, roguelike design patterns
+# Philosophy: Keep it simple, reuse existing assets, demonstrate best practices
+
+================================================================================
+SECTION A: GAMEPLAY ENHANCEMENTS (Reusing Existing Assets)
+================================================================================
+
+1. FOG OF WAR / LIMITED VISION SYSTEM
+   Priority: HIGH | Difficulty: Medium | Asset Reuse: 100%
+
+   Implementation:
+   - Only render tiles within configurable radius of player (e.g., 5-7 tiles)
+   - Darken/hide sprites outside vision range
+   - Reveal map progressively as player explores
+   - Optional: "Memory" mode - show previously visited areas in grayscale
+
+   Benefits:
+   - Dramatically increases tension and horror atmosphere
+   - Makes existing 15 room layouts feel fresh and replayable
+   - Teaches visibility system implementation (common in stealth/horror games)
+   - Reuses all existing sprites with alpha/color modulation
+   - Industry-relevant: Demonstrates render culling and spatial partitioning
+
+   Code Location: main.lua:990-1134 (love.draw function)
+   Suggested Approach: Add visibilityMap table, modify sprite drawing with distance checks
+
+2. GHOST AI BEHAVIOR VARIANTS
+   Priority: HIGH | Difficulty: Medium | Asset Reuse: 100%
+
+   Implementation:
+   - ghost-1.png: Current chasing behavior (aggressive)
+   - ghost-2.png: Patrol patterns along predefined waypoints (territorial)
+   - Optional: Random wanderer, stationary guard, ambush (hides until player approaches)
+
+   Benefits:
+   - Teaches multiple AI patterns with same asset base
+   - Adds strategic depth - players learn enemy patterns
+   - Demonstrates state machines for AI
+   - Industry-relevant: Common pattern in commercial games (e.g., Pac-Man ghost behaviors)
+
+   Code Location: main.lua:850-858 (monster movement)
+   Suggested Approach: Add 'aiType' field to monster table, create behavior functions
+
+3. DYNAMIC ITEM EFFECTS SYSTEM
+   Priority: MEDIUM | Difficulty: Low | Asset Reuse: 100%
+
+   Implementation:
+   - potion-1.png triggers random effect from pool:
+     * Speed boost (current behavior)
+     * Speed reduction (risk/reward)
+     * Ghost speed modification (slow enemies)
+     * Temporary invincibility (5 seconds)
+     * Map reveal pulse (shows full room briefly)
+   - Visual feedback using existing sprites (e.g., color shifts, particle bursts)
+
+   Benefits:
+   - Risk/reward decision-making
+   - Teaches item system architecture
+   - Reuses single sprite for multiple mechanics
+   - Demonstrates random/probabilistic game design
+
+   Code Location: main.lua:944-951 (item collision)
+   Suggested Approach: Create itemEffects table with effect functions, apply on pickup
+
+4. SCORE & STATISTICS TRACKING SYSTEM
+   Priority: MEDIUM | Difficulty: Low | Asset Reuse: N/A
+
+   Implementation:
+   - Track: completion time, rooms visited, keys collected, deaths, items used
+   - Persistent high scores saved to scores.txt
+   - Display on win/lose screens
+   - Optional: Grade system (S/A/B/C ranks based on performance)
+
+   Benefits:
+   - Increases replayability through competition
+   - Teaches file I/O and data persistence
+   - Demonstrates save system architecture
+   - Industry-relevant: Achievement/leaderboard systems
+
+   Code Location: main.lua:656-680 (screen rendering)
+   Suggested Approach: Create stats table, serialize/deserialize functions
+
+5. DIFFICULTY SELECTION SYSTEM
+   Priority: MEDIUM | Difficulty: Low | Asset Reuse: 100%
+
+   Implementation:
+   - Title screen menu: Easy / Normal / Hard / Nightmare
+   - Easy: Slower ghosts, more items, fewer keys required
+   - Normal: Current balance
+   - Hard: Faster ghosts, fewer items, more rooms
+   - Nightmare: Permadeath + fog of war + aggressive AI
+
+   Benefits:
+   - Accessibility for different skill levels
+   - Demonstrates game balancing concepts
+   - Teaches parameter-driven design
+   - Industry-relevant: Standard feature in commercial games
+
+   Code Location: main.lua:5 (currentMode), main.lua:684-755 (love.load)
+   Suggested Approach: Add difficulty parameter affecting spawn rates and speeds
+
+6. ROOM HAZARDS & ENVIRONMENTAL DANGERS
+   Priority: MEDIUM | Difficulty: Medium | Asset Reuse: 90%
+
+   Implementation:
+   - Spike traps using wall sprite variations (periodic damage)
+   - Pressure plates triggering door locks (closed-door.png)
+   - Timed rooms (ceiling collapse - screen shake effect)
+   - Dark zones (reduced vision radius)
+
+   Benefits:
+   - Environmental puzzle-solving
+   - Teaches hazard/trap system design
+   - Reuses wall/door sprites creatively
+   - Adds variety to room exploration
+
+   Code Location: map/*.txt (level design), main.lua:206-238 (deserialize)
+   Suggested Approach: Add new map symbols (^=spike, P=plate), implement in deserialize
+
+7. MINIMAP OVERLAY SYSTEM
+   Priority: LOW | Difficulty: Medium | Asset Reuse: 70%
+
+   Implementation:
+   - Small corner overlay showing current room layout
+   - Player position marked with colored dot
+   - Ghosts shown as red dots (if in vision range)
+   - Keys/items shown as icons
+   - Optional: World map showing room connectivity
+
+   Benefits:
+   - Improves navigation and spatial awareness
+   - Teaches UI/HUD design principles
+   - Demonstrates scaled rendering techniques
+   - Industry-relevant: Essential in exploration games
+
+   Code Location: main.lua:990-1134 (love.draw)
+   Suggested Approach: Create minimapRender function, draw scaled tiles to corner quad
+
+================================================================================
+SECTION B: CODE QUALITY & ARCHITECTURE (For Practitioners)
+================================================================================
+
+8. MODULAR CODE REFACTORING
+   Priority: HIGH | Difficulty: Medium | Impact: High
+
+   Implementation:
+   - Split main.lua into modules:
+     * player.lua - player state, movement, collision
+     * monster.lua - AI, pathfinding, behavior
+     * map.lua - generation, serialization, room management
+     * items.lua - pickup system, effects, inventory
+     * ui.lua - screens, HUD, menus
+     * utils.lua - helper functions
+     * constants.lua - configuration values
+   - Use Lua's require() system for clean imports
+
+   Benefits:
+   - Industry best practice - separation of concerns
+   - Easier to navigate and understand for learners
+   - Better collaboration potential (multiple developers)
+   - Facilitates testing and debugging
+   - Demonstrates professional code organization
+
+   Code Location: Entire main.lua (1134 lines)
+   Suggested Approach: Create src/modules/ directory, extract logical components
+
+9. CONFIGURATION-DRIVEN DESIGN
+   Priority: MEDIUM | Difficulty: Low | Impact: High
+
+   Implementation:
+   - Create config.lua with all magic numbers:
+     * PLAYER_SPEED = 200
+     * MONSTER_SPEED = 50
+     * ITEM_BUFF_DURATION = 5
+     * TILE_SIZE = 20
+     * GHOST_PROXIMITY_THRESHOLD = 100
+   - Easy tweaking without code changes
+   - Support config overrides via config.local.lua (gitignored)
+
+   Benefits:
+   - Teaches parameterization and design patterns
+   - Enables rapid balancing and playtesting
+   - Industry-relevant: Standard in professional development
+   - Facilitates modding/customization
+
+   Code Location: Scattered throughout main.lua (hardcoded values)
+   Suggested Approach: Create config.lua, replace all magic numbers with CONFIG.VALUE
+
+10. DEBUG VISUALIZATION MODE
+    Priority: MEDIUM | Difficulty: Low | Impact: High
+
+    Implementation:
+    - Toggle with F3 key
+    - Display collision boxes (wireframe rectangles)
+    - Show AI pathfinding vectors (lines from ghosts to player)
+    - FPS counter and performance metrics
+    - God mode toggle (F4 - disable collision)
+    - Room coordinate display
+
+    Benefits:
+    - Essential tool for debugging during development
+    - Teaches debugging visualization techniques
+    - Helps learners understand game internals
+    - Industry-relevant: Debug overlays are standard
+
+    Code Location: main.lua:990-1134 (love.draw), main.lua:757-988 (love.update)
+    Suggested Approach: Add debugMode boolean, conditional rendering of debug info
+
+11. STATE MACHINE IMPLEMENTATION
+    Priority: MEDIUM | Difficulty: Medium | Impact: Medium
+
+    Implementation:
+    - Replace currentMode string with proper state machine
+    - States: TitleState, GameState, PauseState, WinState, LoseState
+    - Each state has enter(), update(dt), draw(), exit() methods
+    - Clean transitions with state stacking (pause on top of game)
+
+    Benefits:
+    - Industry-standard pattern for game state management
+    - Cleaner code organization
+    - Easier to add new states (e.g., settings, level select)
+    - Teaches design patterns
+
+    Code Location: main.lua:5 (currentMode), main.lua:761-987 (state logic)
+    Suggested Approach: Create state.lua base class, implement state classes
+
+12. EVENT SYSTEM / OBSERVER PATTERN
+    Priority: LOW | Difficulty: Medium | Impact: Medium
+
+    Implementation:
+    - Event bus for decoupled communication
+    - Events: onKeyCollected, onMonsterKilled, onRoomEntered, onPlayerDeath
+    - Listeners: UI updates, sound triggers, achievement tracking
+    - Decouple systems (e.g., UI doesn't need to know about player internals)
+
+    Benefits:
+    - Professional architecture pattern
+    - Teaches loose coupling and modularity
+    - Easier to extend (add features without modifying core)
+    - Industry-relevant: Used in Unity, Unreal, etc.
+
+    Code Location: main.lua (event triggers scattered throughout)
+    Suggested Approach: Create events.lua with publish/subscribe system
+
+================================================================================
+SECTION C: ROGUELIKE GENRE FEATURES
+================================================================================
+
+13. PROCEDURAL ROOM CONTENT GENERATION
+    Priority: HIGH | Difficulty: High | Asset Reuse: 100%
+
+    Implementation:
+    - Generate room layouts algorithmically, not just connectivity
+    - Algorithms: BSP (Binary Space Partitioning), Cellular Automata, Drunkard's Walk
+    - Ensure playability: path validation, key accessibility
+    - Maintain hand-crafted feel with generation constraints
+    - Optional: Seed-based generation for reproducible maps
+
+    Benefits:
+    - Infinite replayability (core roguelike feature)
+    - Teaches procedural content generation (PCG)
+    - Industry-relevant: Essential skill for roguelike/roguelite developers
+    - Demonstrates algorithm implementation
+
+    Code Location: main.lua:100-158 (randomiseMap), map/*.txt
+    Suggested Approach: Create procgen.lua module, implement room generation algorithm
+
+14. META-PROGRESSION SYSTEM
+    Priority: MEDIUM | Difficulty: Medium | Asset Reuse: 90%
+
+    Implementation:
+    - Persistent unlocks between runs
+    - Unlock system:
+      * New starting items (permanent speed boost)
+      * Additional player sprites (cosmetic)
+      * New room themes (recolor existing sprites)
+      * Starting room selection
+    - Saved to progression.txt
+
+    Benefits:
+    - Addresses roguelike "harshness" - rewards failed runs
+    - Teaches persistence and progression systems
+    - Increases long-term engagement
+    - Industry-relevant: Core feature in roguelites (Hades, Dead Cells)
+
+    Code Location: main.lua:684-755 (love.load)
+    Suggested Approach: Create progression.lua, unlock checks on load
+
+15. INVENTORY & ITEM MANAGEMENT
+    Priority: MEDIUM | Difficulty: Medium | Asset Reuse: 80%
+
+    Implementation:
+    - Hold up to 3 items instead of instant use
+    - Number keys (1/2/3) to activate stored items
+    - Strategic decision: when to use limited resources
+    - UI indicator showing held items
+    - New item types: health potion (using potion sprite), map, shield
+
+    Benefits:
+    - Deeper strategic gameplay
+    - Teaches inventory system architecture
+    - Industry-relevant: Common in RPGs and roguelikes
+    - Reuses existing item sprites
+
+    Code Location: main.lua:944-951 (item pickup)
+    Suggested Approach: Add inventory table, modify item collection logic
+
+16. COMBAT SYSTEM (OPTIONAL)
+    Priority: LOW | Difficulty: High | Asset Reuse: 60%
+
+    Implementation:
+    - Simple attack: Spacebar to attack in facing direction
+    - Ghosts have 3 HP (require 3 hits)
+    - Attack cooldown (1 second)
+    - Ghost death: drop key or item
+    - Risk/reward: engage or avoid
+
+    Benefits:
+    - Active gameplay (not just avoidance)
+    - Teaches combat system design
+    - Adds player agency and skill expression
+    - Common in action roguelikes (Binding of Isaac)
+
+    Code Location: main.lua:932-940 (monster collision)
+    Suggested Approach: Add attack state, cooldown timer, monster health tracking
+
+17. DAILY CHALLENGE MODE
+    Priority: LOW | Difficulty: Low | Asset Reuse: 100%
+
+    Implementation:
+    - Fixed seed based on current date
+    - Everyone plays same map each day
+    - Leaderboard for daily best times
+    - Demonstrates seeded randomization
+
+    Benefits:
+    - Community engagement potential
+    - Teaches seeded generation
+    - Industry-relevant: Popularized by Spelunky, now standard
+
+    Code Location: main.lua:100-158 (randomiseMap)
+    Suggested Approach: Use os.date() as seed, modify math.randomseed calls
+
+================================================================================
+SECTION D: POLISH & GAME FEEL
+================================================================================
+
+18. PARTICLE EFFECT SYSTEM
+    Priority: MEDIUM | Difficulty: Medium | Asset Reuse: 80%
+
+    Implementation:
+    - Key collection: Gold sparkles (recolored sprites)
+    - Speed boost: Motion trail behind player
+    - Ghost proximity: Purple mist particles
+    - Door open: Dust cloud effect
+    - Death: Tombstone appearance with particle burst
+
+    Benefits:
+    - Significantly improves game feel
+    - Teaches particle system implementation
+    - Visual feedback for game events
+    - Industry-relevant: Essential for polish
+
+    Code Location: main.lua:990-1134 (love.draw)
+    Suggested Approach: Use Love2D's particle system, create effect definitions
+
+19. SCREEN SHAKE & CAMERA EFFECTS
+    Priority: LOW | Difficulty: Low | Asset Reuse: 100%
+
+    Implementation:
+    - Ghost collision: Screen shake
+    - Door opening: Camera zoom-in
+    - Room transition: Fade effect
+    - Speed boost: FOV increase
+
+    Benefits:
+    - Dramatically improves game feel
+    - Teaches camera manipulation
+    - Industry-relevant: "Juice" is critical for commercial games
+
+    Code Location: main.lua:990-1134 (love.draw)
+    Suggested Approach: Camera offset modification, love.graphics.translate
+
+20. ANIMATION SYSTEM
+    Priority: MEDIUM | Difficulty: Medium | Asset Reuse: 50%
+
+    Implementation:
+    - Player walk cycle: Alternate between frames
+    - Ghost float: Bobbing motion (sin wave)
+    - Chest opening: Sprite swap animation
+    - Door opening: Sliding animation
+
+    Benefits:
+    - Brings static sprites to life
+    - Teaches sprite animation techniques
+    - Industry-relevant: Essential skill
+
+    Code Location: main.lua:990-1134 (sprite drawing)
+    Suggested Approach: Add animation state tracking, frame timers
+    Note: May require creating additional sprite frames
+
+21. AUDIO IMPROVEMENTS
+    Priority: LOW | Difficulty: Low | Asset Reuse: 100%
+
+    Implementation:
+    - Positional audio for ghosts (volume based on distance)
+    - Footstep variation based on tile type
+    - Background music with dynamic intensity (calm vs chase)
+    - Audio ducking (lower music when sounds play)
+
+    Benefits:
+    - Improves immersion and atmosphere
+    - Teaches audio programming
+    - Industry-relevant: Audio design is crucial
+
+    Code Location: main.lua:732-743 (sound loading)
+    Suggested Approach: Modify love.audio calls with distance-based volume
+
+22. IMPROVED UI/UX
+    Priority: MEDIUM | Difficulty: Low | Asset Reuse: 70%
+
+    Implementation:
+    - HUD overlay: Key counter with icons, speed buff indicator
+    - Pause menu: Resume / Restart / Quit
+    - Settings menu: Volume sliders, difficulty selection
+    - Tutorial overlay on first run
+    - Button prompts (visual keyboard indicators)
+
+    Benefits:
+    - Better user experience
+    - Teaches UI/UX design principles
+    - Industry-relevant: Critical for commercial games
+
+    Code Location: main.lua:643-680 (screen drawing)
+    Suggested Approach: Create ui.lua module, overlay rendering system
+
+================================================================================
+SECTION E: DEVELOPER TOOLS & INFRASTRUCTURE
+================================================================================
+
+23. IN-GAME LEVEL EDITOR
+    Priority: HIGH | Difficulty: High | Impact: HIGH
+
+    Implementation:
+    - Toggle with F5 key
+    - Click to place walls, monsters, items, keys
+    - Save custom rooms to map/ directory
+    - Load saved rooms for testing
+    - Grid overlay for precise placement
+
+    Benefits:
+    - Extremely valuable for game designers
+    - Rapid level iteration
+    - Teaches editor tool development
+    - Industry-relevant: Level editors are essential tools
+    - Makes Tikrit a teaching platform for level design
+
+    Code Location: main.lua:175-203 (serialize function)
+    Suggested Approach: Create editor.lua state, mouse input handling, tile placement
+
+24. AUTOMATED TESTING FRAMEWORK
+    Priority: MEDIUM | Difficulty: Medium | Impact: Medium
+
+    Implementation:
+    - Unit tests for utility functions (collision, pathfinding, map generation)
+    - Integration tests for game logic (key collection, door opening)
+    - Map validation tests (ensure all keys reachable)
+    - Use Lua's busted or luaunit testing framework
+
+    Benefits:
+    - Professional development practice
+    - Prevents regression bugs
+    - Teaches testing methodologies
+    - Industry-relevant: Essential in professional development
+
+    Code Location: test/ directory (create new files)
+    Suggested Approach: Install busted, create test/spec/ directory with tests
+
+25. BUILD & DISTRIBUTION PIPELINE
+    Priority: LOW | Difficulty: Low | Impact: Medium
+
+    Implementation:
+    - Automated .love file creation
+    - Cross-platform builds (Windows .exe, macOS .app, Linux AppImage)
+    - Makefile targets: `make release`, `make dist`
+    - Version numbering system
+    - Changelog generation
+
+    Benefits:
+    - Teaches build automation
+    - Easier distribution for players
+    - Industry-relevant: CI/CD practices
+
+    Code Location: makefile (extend existing)
+    Suggested Approach: Add build targets using love-release or similar tools
+
+26. PERFORMANCE PROFILING TOOLS
+    Priority: LOW | Difficulty: Low | Impact: Low
+
+    Implementation:
+    - FPS counter and frame time graph
+    - Memory usage tracking
+    - Draw call counter
+    - Hotspot identification (which functions are slowest)
+    - Toggle with F6 key
+
+    Benefits:
+    - Teaches performance optimization
+    - Identifies bottlenecks
+    - Industry-relevant: Profiling is critical skill
+
+    Code Location: main.lua:757-988 (love.update)
+    Suggested Approach: Use Love2D's love.timer, create profiler.lua
+
+27. REPLAY SYSTEM
+    Priority: LOW | Difficulty: Medium | Impact: Low
+
+    Implementation:
+    - Record all player inputs with timestamps
+    - Save to replay.txt
+    - Playback mode: Deterministic replay of recorded session
+    - Useful for bug reproduction, speedrun verification, tutorials
+
+    Benefits:
+    - Teaches input recording systems
+    - Debugging tool for non-reproducible bugs
+    - Industry-relevant: Used in fighting games, speedrun communities
+
+    Code Location: main.lua:874-972 (input handling)
+    Suggested Approach: Create replay.lua, record inputs to table, save/load system
+
+28. COMPREHENSIVE DOCUMENTATION
+    Priority: MEDIUM | Difficulty: Low | Impact: HIGH
+
+    Implementation:
+    - Code comments explaining complex algorithms
+    - docs/ directory with:
+      * ARCHITECTURE.md - System overview
+      * LEVEL_DESIGN.md - Room creation guide
+      * MODDING.md - How to extend the game
+      * API.md - Function reference
+    - README improvements: Screenshots, feature list, controls
+
+    Benefits:
+    - Makes codebase accessible to learners
+    - Demonstrates documentation best practices
+    - Industry-relevant: Documentation is critical
+    - Increases educational value
+
+    Code Location: All files (add comments), create docs/
+    Suggested Approach: Write markdown docs, add inline comments
+
+================================================================================
+SECTION F: CREATIVE GAMEPLAY VARIANTS (Using Existing Assets)
+================================================================================
+
+29. STEALTH MODE VARIANT
+    Priority: MEDIUM | Difficulty: Medium | Asset Reuse: 100%
+
+    Implementation:
+    - Ghosts have vision cones (use fog of war system)
+    - Avoid detection rather than collision
+    - Caught = alerting all ghosts in room
+    - Hide mechanic behind walls
+    - Silent movement when not sprinting
+
+    Benefits:
+    - Completely different gameplay feel with same assets
+    - Teaches stealth system design
+    - Demonstrates gameplay variety from simple rule changes
+
+    Code Location: main.lua:850-872 (monster AI)
+    Suggested Approach: Add ghost vision checks, detection states
+
+30. TIME ATTACK MODE
+    Priority: LOW | Difficulty: Low | Asset Reuse: 100%
+
+    Implementation:
+    - Timer displayed on HUD
+    - Par times for each difficulty level
+    - Ghosts move faster as time increases
+    - Speed running incentives
+    - Time bonuses for collecting all items
+
+    Benefits:
+    - Increases replayability
+    - Teaches time pressure mechanics
+    - Demonstrates UI integration
+
+    Code Location: main.lua:7 (elapsedTime already tracked!)
+    Suggested Approach: Display timer, add time-based difficulty scaling
+
+31. PUZZLE MODE VARIANT
+    Priority: MEDIUM | Difficulty: High | Asset Reuse: 95%
+
+    Implementation:
+    - No ghosts (remove threat)
+    - Focus on environmental puzzles
+    - Push-block puzzles (move walls with player)
+    - Pressure plate sequences (open doors in order)
+    - Minimal keys (one per room)
+    - Logic-based progression
+
+    Benefits:
+    - Demonstrates genre flexibility
+    - Teaches puzzle design principles
+    - Different audience appeal
+    - Reuses nearly all assets
+
+    Code Location: main.lua (modify game rules)
+    Suggested Approach: Create puzzle mode flag, disable monsters, add push mechanics
+
+32. MULTIPLAYER LOCAL CO-OP (AMBITIOUS)
+    Priority: LOW | Difficulty: VERY HIGH | Asset Reuse: 100%
+
+    Implementation:
+    - Player 2 uses different controls (IJKL or controller)
+    - Shared keys and items
+    - Both must survive
+    - Co-op strategies (distraction, coordination)
+    - Split-screen option
+
+    Benefits:
+    - Completely new dimension to gameplay
+    - Teaches multiplayer system design
+    - Industry-relevant: Co-op is highly valued
+    - No new assets needed
+
+    Code Location: main.lua:11-18 (world.player), main.lua:885-911 (input)
+    Suggested Approach: Add player2 table, duplicate input handling
+
+================================================================================
+SECTION G: ACCESSIBILITY & INCLUSIVITY
+================================================================================
+
+33. ACCESSIBILITY OPTIONS
+    Priority: MEDIUM | Difficulty: Low | Impact: HIGH
+
+    Implementation:
+    - Colorblind modes (adjust sprite colors)
+    - Adjustable font sizes
+    - High contrast mode
+    - Configurable controls (rebind keys)
+    - Visual indicators for audio cues (ghost proximity indicator)
+    - Slow mode (reduce all speeds by 50%)
+
+    Benefits:
+    - Makes game accessible to more players
+    - Teaches accessibility design principles
+    - Industry-relevant: Increasingly required
+    - Demonstrates inclusive design
+
+    Code Location: main.lua (settings system)
+    Suggested Approach: Create accessibility.lua config, apply filters
+
+34. INTERNATIONALIZATION (i18n)
+    Priority: LOW | Difficulty: Low | Impact: Medium
+
+    Implementation:
+    - Extract all text strings to language files
+    - Support multiple languages (English, Spanish, Chinese, etc.)
+    - Language selection in settings
+    - Use locale files (lang/en.lua, lang/es.lua)
+
+    Benefits:
+    - Teaches localization practices
+    - Expands potential audience
+    - Industry-relevant: Required for global releases
+
+    Code Location: main.lua:643-680 (text strings)
+    Suggested Approach: Create lang/ directory, lookup table system
+
+================================================================================
+IMPLEMENTATION PRIORITY MATRIX
+================================================================================
+
+QUICK WINS (High Impact, Low Difficulty):
+- Difficulty Selection System (#5)
+- Configuration-Driven Design (#9)
+- Debug Visualization Mode (#10)
+- Score & Statistics Tracking (#4)
+- Improved UI/UX (#22)
+- Accessibility Options (#33)
+
+HIGH IMPACT (For Practitioners):
+- Modular Code Refactoring (#8)
+- In-Game Level Editor (#23)
+- Fog of War System (#1)
+- Procedural Room Generation (#13)
+- Comprehensive Documentation (#28)
+
+EDUCATIONAL VALUE (Best for Learning):
+- Ghost AI Behavior Variants (#2)
+- State Machine Implementation (#11)
+- Event System (#12)
+- Automated Testing Framework (#24)
+- Particle Effect System (#18)
+
+REPLAYABILITY BOOSTERS:
+- Fog of War (#1)
+- Procedural Room Generation (#13)
+- Meta-Progression System (#14)
+- Daily Challenge Mode (#17)
+- Difficulty Selection (#5)
+
+GAME FEEL IMPROVEMENTS:
+- Particle Effects (#18)
+- Animation System (#20)
+- Screen Shake & Camera Effects (#19)
+- Audio Improvements (#21)
+
+================================================================================
+PHILOSOPHICAL ALIGNMENT CHECK
+================================================================================
+
+All suggestions maintain Tikrit's core identity:
+✓ Horror-themed dungeon crawler aesthetic
+✓ Simple, accessible gameplay loop
+✓ Roguelike genre conventions
+✓ Educational/teaching focus
+✓ Minimal external dependencies
+✓ Cross-platform compatibility (Love2D)
+✓ Free/open asset usage where possible
+✓ Grid-based tile system
+✓ Small, focused scope (avoid feature creep)
+
+================================================================================
+RECOMMENDED IMPLEMENTATION ORDER
+================================================================================
+
+Phase 1 - Foundation (Weeks 1-2):
+1. Modular Code Refactoring (#8)
+2. Configuration-Driven Design (#9)
+3. Debug Visualization Mode (#10)
+
+Phase 2 - Core Features (Weeks 3-4):
+4. Fog of War System (#1)
+5. Ghost AI Variants (#2)
+6. Score & Statistics Tracking (#4)
+
+Phase 3 - Polish (Weeks 5-6):
+7. Particle Effects (#18)
+8. Improved UI/UX (#22)
+9. Audio Improvements (#21)
+
+Phase 4 - Advanced (Weeks 7-8):
+10. In-Game Level Editor (#23)
+11. Procedural Room Generation (#13)
+12. Comprehensive Documentation (#28)
+
+Phase 5 - Long-term:
+13. Meta-Progression System (#14)
+14. Automated Testing (#24)
+15. Accessibility Options (#33)
+
+================================================================================
+NOTES FOR IMPLEMENTATION
+================================================================================
+
+- Maintain backward compatibility with existing maps
+- Keep Love2D as only dependency
+- Document all new features thoroughly
+- Add configuration toggles for experimental features
+- Preserve original game mode as "Classic" option
+- Use existing code style and conventions
+- Ensure all additions are optional/modular
+- Test on Linux primarily (project's target platform)
+- Consider creating feature branches for major changes
+- Update README.md with new features
+
+================================================================================
+POTENTIAL CHALLENGES & SOLUTIONS
+================================================================================
+
+Challenge: Single-file architecture makes refactoring difficult
+Solution: Use Lua's require() system, maintain compatibility layer
+
+Challenge: Procedural generation may reduce hand-crafted feel
+Solution: Use hybrid approach - generate from templates, tune constraints
+
+Challenge: Fog of war may impact performance
+Solution: Implement spatial partitioning, only check visible tiles
+
+Challenge: Additional features increase complexity
+Solution: Make everything optional via config flags, maintain classic mode
+
+Challenge: Testing without breaking existing behavior
+Solution: Implement automated tests before refactoring, regression suite
+
+================================================================================
+COMMUNITY & CONTRIBUTION IDEAS
+================================================================================
+
+- Create workshop/mod system for community maps
+- Host level design competitions
+- Speedrun leaderboards
+- Open source additional asset packs
+- Video tutorial series on implementing each feature
+- Developer commentary mode explaining code decisions
+- Contribution guide for new developers
+
+================================================================================
+END OF SUGGESTIONS
+================================================================================
+
+This document represents a comprehensive analysis of potential improvements
+that balance educational value, industry relevance, and practical utility
+while respecting Tikrit's original vision as a simple, accessible roguelike
+teaching project.
+
+For questions or discussions about these suggestions, please open an issue
+on the GitHub repository.
