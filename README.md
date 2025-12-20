@@ -18,10 +18,17 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 
 ### Controls
 - **Movement**: WASD or Arrow Keys
+- **Pause**: P or ESC
 - **Debug Mode**: F3 (shows FPS, collision boxes, AI vectors, stats)
 - **God Mode**: F4 (disable collision for testing)
 - **Fog of War Toggle**: F5 (enable/disable during gameplay)
-- **Quit**: ESC
+- **Menu Navigation**: Up/Down arrows
+- **Menu Selection**: Enter
+
+### HUD
+- Key collection progress
+- Current room number  
+- Active effect indicators (Invincible, Ghosts Slowed, Map Revealed)
 
 ### Developer Features
 - Configuration-driven design via `config.lua`
