@@ -10,6 +10,16 @@ local elapsedTime = 0
 local debugMode = false
 local godMode = false
 
+-- Item effects tracking
+local activeEffects = {
+    invincibility = false,
+    invincibilityTimer = 0,
+    mapReveal = false,
+    mapRevealTimer = 0,
+    ghostSlow = false,
+    ghostSlowTimer = 0,
+}
+
 local stats = {
     startTime = 0,
     roomsVisited = {},
@@ -763,6 +773,90 @@ function moveGhostPatrol(monsterIndex, dt, speed)
     end
 end
 
+-- Item effect functions
+function applyRandomItemEffect()
+    math.randomseed(os.time())
+    local effect = math.random(1, 6)
+    
+    if effect == 1 then
+        -- Speed boost (original behavior)
+        world.player.speed = world.player.speed + CONFIG.PLAYER_SPEED_BUFF
+        print("Item effect: Speed Boost!")
+        return "Speed Boost!"
+    elseif effect == 2 then
+        -- Speed reduction (risk!)
+        world.player.speed = math.max(100, world.player.speed - 100)
+        print("Item effect: Speed Reduced!")
+        return "Speed Reduced!"
+    elseif effect == 3 then
+        -- Slow ghosts
+        activeEffects.ghostSlow = true
+        activeEffects.ghostSlowTimer = CONFIG.PLAYER_SPEED_BUFF_DURATION
+        print("Item effect: Ghosts Slowed!")
+        return "Ghosts Slowed!"
+    elseif effect == 4 then
+        -- Temporary invincibility
+        activeEffects.invincibility = true
+        activeEffects.invincibilityTimer = CONFIG.INVINCIBILITY_DURATION
+        print("Item effect: Invincibility!")
+        return "Invincibility!"
+    elseif effect == 5 then
+        -- Map reveal pulse
+        activeEffects.mapReveal = true
+        activeEffects.mapRevealTimer = CONFIG.MAP_REVEAL_DURATION
+        -- Reveal all tiles
+        for y = 0, CONFIG.MAP_HEIGHT, CONFIG.TILE_SIZE do
+            for x = 0, CONFIG.MAP_WIDTH, CONFIG.TILE_SIZE do
+                local key = x .. "," .. y
+                currentVisibleTiles[key] = true
+            end
+        end
+        print("Item effect: Map Revealed!")
+        return "Map Revealed!"
+    else
+        -- Double speed boost (rare!)
+        world.player.speed = world.player.speed + CONFIG.PLAYER_SPEED_BUFF * 2
+        print("Item effect: MEGA Speed Boost!")
+        return "MEGA Speed Boost!"
+    end
+end
+
+function updateItemEffects(dt)
+    -- Update invincibility
+    if activeEffects.invincibility then
+        activeEffects.invincibilityTimer = activeEffects.invincibilityTimer - dt
+        if activeEffects.invincibilityTimer <= 0 then
+            activeEffects.invincibility = false
+            activeEffects.invincibilityTimer = 0
+            print("Invincibility wore off")
+        end
+    end
+    
+    -- Update map reveal
+    if activeEffects.mapReveal then
+        activeEffects.mapRevealTimer = activeEffects.mapRevealTimer - dt
+        if activeEffects.mapRevealTimer <= 0 then
+            activeEffects.mapReveal = false
+            activeEffects.mapRevealTimer = 0
+            -- Clear temporary reveals
+            if CONFIG.FOG_ENABLED then
+                currentVisibleTiles = {}
+            end
+            print("Map reveal wore off")
+        end
+    end
+    
+    -- Update ghost slow
+    if activeEffects.ghostSlow then
+        activeEffects.ghostSlowTimer = activeEffects.ghostSlowTimer - dt
+        if activeEffects.ghostSlowTimer <= 0 then
+            activeEffects.ghostSlow = false
+            activeEffects.ghostSlowTimer = 0
+            print("Ghost slow wore off")
+        end
+    end
+end
+
 -- FUA add and spruce up these screens
 function drawTitleScreen()
     local text1 = "TIKRIT"
@@ -1068,6 +1162,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
     -- ---------- ITEM EFFECT TIMEOUT ----------
 
+        -- Update all active item effects
+        updateItemEffects(dt)
+
         if player.speed > CONFIG.PLAYER_SPEED then
             elapsedTime = elapsedTime + dt
             if elapsedTime > CONFIG.PLAYER_SPEED_BUFF_DURATION then
@@ -1085,13 +1182,19 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
         for i, monsterCoord in ipairs(monsters.coord) do
             local aiType = world.monster.aiTypes[i] or 1
+            local effectiveSpeed = monsters.speed
+            
+            -- Apply ghost slow effect
+            if activeEffects.ghostSlow then
+                effectiveSpeed = effectiveSpeed * CONFIG.GHOST_SLOW_MULTIPLIER
+            end
             
             if aiType == 1 then
                 -- Chase behavior (aggressive)
-                moveGhostChase(monsterCoord, player.coord, dt, monsters.speed)
+                moveGhostChase(monsterCoord, player.coord, dt, effectiveSpeed)
             elseif aiType == 2 then
                 -- Patrol behavior (territorial)
-                moveGhostPatrol(i, dt, monsters.speed)
+                moveGhostPatrol(i, dt, effectiveSpeed)
             end
         end
 
@@ -1210,12 +1313,15 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             for _, monsterCoord in ipairs(monsters.coord) do
                 if checkCollision(monsterCoord, player.coord) then
-                    if not godMode then
+                    if not godMode and not activeEffects.invincibility then
                         player.coord[1], player.coord[2] = storedX, storedY
                         player.alive = false
                         stats.deaths = stats.deaths + 1
                         print("player died")
                         love.audio.play(playerDeathSound)
+                    elseif activeEffects.invincibility then
+                        -- Just bounce back but don't die
+                        player.coord[1], player.coord[2] = storedX, storedY
                     end
                     -- love.event.quit()
                 end
@@ -1225,10 +1331,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             for i, itemCoord in ipairs(items.coord) do 
                 if checkCollision(itemCoord, player.coord) then
-                    player.speed = player.speed + items.buffSpeed
+                    applyRandomItemEffect()
                     table.remove(items.coord, i)
                     stats.itemsUsed = stats.itemsUsed + 1
-                    print("item picked up, player speed increased" , player.speed)
                     love.audio.play(playerItemSound)
                 end
             end
@@ -1462,7 +1567,18 @@ function love.draw() -- draw function that runs once every frame
         -- DRAW PLAYER CHARACTER
 
         if world.player.alive then
-            love.graphics.setColor(0.5, 0.5, 0.5, 1)
+            -- Apply color based on active effects
+            if activeEffects.invincibility then
+                -- Flash yellow/white for invincibility
+                local flash = math.sin(love.timer.getTime() * 10) > 0
+                if flash then
+                    love.graphics.setColor(1, 1, 0, 1)
+                else
+                    love.graphics.setColor(1, 1, 1, 1)
+                end
+            else
+                love.graphics.setColor(0.5, 0.5, 0.5, 1)
+            end
             love.graphics.draw(playerSprite, playerCoord[1], playerCoord[2])
         else
             love.graphics.setColor(0.5, 0.5, 0.5, 1)
@@ -1542,6 +1658,24 @@ function love.draw() -- draw function that runs once every frame
             love.graphics.print("Rooms: " .. roomCount, 10, 60)
             love.graphics.print("Keys: " .. world.player.overallKeyCount .. "/" .. world.key.globalCount, 10, 85)
             love.graphics.print("Speed: " .. world.player.speed, 10, 110)
+            
+            -- Active effects
+            local yPos = 135
+            if activeEffects.invincibility then
+                love.graphics.setColor(1, 1, 0, 1)
+                love.graphics.print(string.format("Invincible: %.1fs", activeEffects.invincibilityTimer), 10, yPos)
+                yPos = yPos + 25
+            end
+            if activeEffects.ghostSlow then
+                love.graphics.setColor(0, 1, 1, 1)
+                love.graphics.print(string.format("Ghosts Slowed: %.1fs", activeEffects.ghostSlowTimer), 10, yPos)
+                yPos = yPos + 25
+            end
+            if activeEffects.mapReveal then
+                love.graphics.setColor(1, 0.5, 0, 1)
+                love.graphics.print(string.format("Map Reveal: %.1fs", activeEffects.mapRevealTimer), 10, yPos)
+                yPos = yPos + 25
+            end
         end
 
     elseif currentMode == "winScreen" then
