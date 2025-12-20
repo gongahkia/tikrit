@@ -18,6 +18,10 @@ local stats = {
     itemsUsed = 0,
 }
 
+-- Fog of War tracking
+local visibilityMap = {} -- tracks which tiles have been seen
+local currentVisibleTiles = {} -- currently visible tiles
+
 local world = {
 
     player = {
@@ -651,6 +655,50 @@ function ghostProxCheck(playerCoord, monsterCoords)
     return false
 end
 
+-- Fog of War helper functions
+function updateVisibility(playerCoord)
+    currentVisibleTiles = {}
+    local playerTileX = math.floor(playerCoord[1] / CONFIG.TILE_SIZE)
+    local playerTileY = math.floor(playerCoord[2] / CONFIG.TILE_SIZE)
+    
+    for dy = -CONFIG.VISION_RADIUS, CONFIG.VISION_RADIUS do
+        for dx = -CONFIG.VISION_RADIUS, CONFIG.VISION_RADIUS do
+            local distance = math.sqrt(dx * dx + dy * dy)
+            if distance <= CONFIG.VISION_RADIUS then
+                local tileX = playerTileX + dx
+                local tileY = playerTileY + dy
+                local worldX = tileX * CONFIG.TILE_SIZE
+                local worldY = tileY * CONFIG.TILE_SIZE
+                
+                if worldX >= 0 and worldX < CONFIG.MAP_WIDTH and worldY >= 0 and worldY < CONFIG.MAP_HEIGHT then
+                    local key = worldX .. "," .. worldY
+                    currentVisibleTiles[key] = true
+                    
+                    if CONFIG.SHOW_VISITED then
+                        visibilityMap[key] = true
+                    end
+                end
+            end
+        end
+    end
+end
+
+function isVisible(x, y)
+    if not CONFIG.FOG_ENABLED then
+        return true
+    end
+    local key = x .. "," .. y
+    return currentVisibleTiles[key] ~= nil
+end
+
+function hasBeenVisited(x, y)
+    if not CONFIG.FOG_ENABLED or not CONFIG.SHOW_VISITED then
+        return false
+    end
+    local key = x .. "," .. y
+    return visibilityMap[key] ~= nil and currentVisibleTiles[key] == nil
+end
+
 -- FUA add and spruce up these screens
 function drawTitleScreen()
     local text1 = "TIKRIT"
@@ -927,6 +975,12 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             if not stats.roomsVisited[nextRoom] then
                 stats.roomsVisited[nextRoom] = true
             end
+            
+            -- Reset fog of war for new room
+            if CONFIG.FOG_ENABLED then
+                visibilityMap = {}
+                currentVisibleTiles = {}
+            end
 
             doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
             openedDoorSpriteCoords = shallowCopy(doorList)
@@ -1012,6 +1066,21 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             end
         else
             f4Pressed = false
+        end
+        
+        -- fog of war toggle (F5)
+        if love.keyboard.isDown("f5") then
+            if not f5Pressed then
+                CONFIG.FOG_ENABLED = not CONFIG.FOG_ENABLED
+                f5Pressed = true
+                print("Fog of war:", CONFIG.FOG_ENABLED)
+                if not CONFIG.FOG_ENABLED then
+                    visibilityMap = {}
+                    currentVisibleTiles = {}
+                end
+            end
+        else
+            f5Pressed = false
         end
 
         -- PLAYER MOVEMENT
@@ -1112,6 +1181,12 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
                 end
             end
+            
+        -- Update fog of war visibility
+        if CONFIG.FOG_ENABLED then
+            updateVisibility(player.coord)
+        end
+        
         end
 
     elseif currentMode == "winScreen" then
@@ -1156,10 +1231,24 @@ function love.draw() -- draw function that runs once every frame
         for _,val in ipairs(randomFloorMap) do
             if val[1] == world.player.currRoom then
                 for _,el in ipairs(val[2]) do
-                    if el[2] == 1 then
-                        love.graphics.draw(floorSprite1, el[1][1], el[1][2])
-                    elseif el[2] == 2 then
-                        love.graphics.draw(floorSprite2, el[1][1], el[1][2])
+                    local x, y = el[1][1], el[1][2]
+                    local visible = isVisible(x, y)
+                    local visited = hasBeenVisited(x, y)
+                    
+                    if visible then
+                        love.graphics.setColor(0.5, 0.5, 0.5, 1)
+                        if el[2] == 1 then
+                            love.graphics.draw(floorSprite1, x, y)
+                        elseif el[2] == 2 then
+                            love.graphics.draw(floorSprite2, x, y)
+                        end
+                    elseif visited then
+                        love.graphics.setColor(0.5, 0.5, 0.5, CONFIG.VISITED_ALPHA)
+                        if el[2] == 1 then
+                            love.graphics.draw(floorSprite1, x, y)
+                        elseif el[2] == 2 then
+                            love.graphics.draw(floorSprite2, x, y)
+                        end
                     end
                 end
             end
@@ -1173,13 +1262,29 @@ function love.draw() -- draw function that runs once every frame
         for _, val in ipairs(randomWallMap) do
             if val[1] == world.player.currRoom then
                 for _, el in ipairs(val[2]) do
+                    local x, y = el[1][1], el[1][2]
                     if inside(el[1], world.wall.coord) then
-                        if el[2] == 1 then
-                            love.graphics.draw(wallSprite1, el[1][1], el[1][2])
-                        elseif el[2] == 2 then
-                            love.graphics.draw(wallSprite2, el[1][1], el[1][2])
-                        elseif el[2] == 3 then
-                            love.graphics.draw(wallSprite3, el[1][1], el[1][2])
+                        local visible = isVisible(x, y)
+                        local visited = hasBeenVisited(x, y)
+                        
+                        if visible then
+                            love.graphics.setColor(0.5, 0.5, 0.5, 1)
+                            if el[2] == 1 then
+                                love.graphics.draw(wallSprite1, x, y)
+                            elseif el[2] == 2 then
+                                love.graphics.draw(wallSprite2, x, y)
+                            elseif el[2] == 3 then
+                                love.graphics.draw(wallSprite3, x, y)
+                            end
+                        elseif visited then
+                            love.graphics.setColor(0.5, 0.5, 0.5, CONFIG.VISITED_ALPHA)
+                            if el[2] == 1 then
+                                love.graphics.draw(wallSprite1, x, y)
+                            elseif el[2] == 2 then
+                                love.graphics.draw(wallSprite2, x, y)
+                            elseif el[2] == 3 then
+                                love.graphics.draw(wallSprite3, x, y)
+                            end
                         end
                     end
                 end
@@ -1219,12 +1324,24 @@ function love.draw() -- draw function that runs once every frame
         -- DRAW DOORS
 
         for _, openedDoorCoord in ipairs(openedDoorSpriteCoords) do
-            love.graphics.draw(openedDoorSprite, openedDoorCoord[1], openedDoorCoord[2])
+            if isVisible(openedDoorCoord[1], openedDoorCoord[2]) then
+                love.graphics.setColor(0.5, 0.5, 0.5, 1)
+                love.graphics.draw(openedDoorSprite, openedDoorCoord[1], openedDoorCoord[2])
+            elseif hasBeenVisited(openedDoorCoord[1], openedDoorCoord[2]) then
+                love.graphics.setColor(0.5, 0.5, 0.5, CONFIG.VISITED_ALPHA)
+                love.graphics.draw(openedDoorSprite, openedDoorCoord[1], openedDoorCoord[2])
+            end
         end
 
         -- love.graphics.setColor(1, 0.5, 0.5)
         for _, doorCoord in ipairs(doors) do
-            love.graphics.draw(closedDoorSprite, doorCoord[1], doorCoord[2])
+            if isVisible(doorCoord[1], doorCoord[2]) then
+                love.graphics.setColor(0.5, 0.5, 0.5, 1)
+                love.graphics.draw(closedDoorSprite, doorCoord[1], doorCoord[2])
+            elseif hasBeenVisited(doorCoord[1], doorCoord[2]) then
+                love.graphics.setColor(0.5, 0.5, 0.5, CONFIG.VISITED_ALPHA)
+                love.graphics.draw(closedDoorSprite, doorCoord[1], doorCoord[2])
+            end
             -- love.graphics.rectangle("fill", doorCoord[1], doorCoord[2], 20, 20)
         end
 
@@ -1234,7 +1351,10 @@ function love.draw() -- draw function that runs once every frame
 
         if world.player.alive then 
             for _, monsterCoord in ipairs(monsters) do
-                love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2])
+                if isVisible(monsterCoord[1], monsterCoord[2]) then
+                    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+                    love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2])
+                end
                 -- love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
             end 
         else
@@ -1244,7 +1364,10 @@ function love.draw() -- draw function that runs once every frame
 
         -- love.graphics.setColor(0,0,1)
         for _, itemCoord in ipairs(items) do
-            love.graphics.draw(itemSprite, itemCoord[1], itemCoord[2])
+            if isVisible(itemCoord[1], itemCoord[2]) then
+                love.graphics.setColor(0.5, 0.5, 0.5, 1)
+                love.graphics.draw(itemSprite, itemCoord[1], itemCoord[2])
+            end
             -- love.graphics.rectangle("fill", itemCoord[1], itemCoord[2], 20, 20)
         end
 
@@ -1252,15 +1375,20 @@ function love.draw() -- draw function that runs once every frame
 
         -- love.graphics.setColor(1,1,0)
         for _, keyCoord in ipairs(keys) do
-            love.graphics.draw(closedChestSprite, keyCoord[1], keyCoord[2])
+            if isVisible(keyCoord[1], keyCoord[2]) then
+                love.graphics.setColor(0.5, 0.5, 0.5, 1)
+                love.graphics.draw(closedChestSprite, keyCoord[1], keyCoord[2])
+            end
             -- love.graphics.rectangle("fill", keyCoord[1], keyCoord[2], 20, 20)
         end
 
         -- DRAW PLAYER CHARACTER
 
         if world.player.alive then
+            love.graphics.setColor(0.5, 0.5, 0.5, 1)
             love.graphics.draw(playerSprite, playerCoord[1], playerCoord[2])
         else
+            love.graphics.setColor(0.5, 0.5, 0.5, 1)
             love.graphics.draw(deadPlayerSprite, playerCoord[1], playerCoord[2])
         end
 
