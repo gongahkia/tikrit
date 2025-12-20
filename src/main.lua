@@ -4,6 +4,7 @@
 local CONFIG = require("config")
 
 local currentMode = "titleScreen"
+local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
 
 local elapsedTime = 0
 local debugMode = false
@@ -653,14 +654,32 @@ end
 -- FUA add and spruce up these screens
 function drawTitleScreen()
     local text1 = "TIKRIT"
-    local text2 = "enter to start"
+    local text2 = "Select Difficulty"
     local text3 = "Made by @gongahkia on Github in Love2D"
+    local difficulties = {"Easy", "Normal", "Hard", "Nightmare"}
+    
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.setFont(AmaticFont80)
-    love.graphics.print("TIKRIT", (love.graphics.getWidth() - AmaticFont80:getWidth(text1))/2, (love.graphics.getHeight() - AmaticFont80:getHeight(text))/2 - 100)
+    love.graphics.print("TIKRIT", (love.graphics.getWidth() - AmaticFont80:getWidth(text1))/2, 50)
+    
     love.graphics.setFont(AmaticFont40)
-    love.graphics.print("enter to start", (love.graphics.getWidth() - AmaticFont40:getWidth(text2))/2, 300)
+    love.graphics.print("Select Difficulty", (love.graphics.getWidth() - AmaticFont40:getWidth(text2))/2, 150)
+    
+    -- Draw difficulty options
+    for i, diff in ipairs(difficulties) do
+        local y = 200 + (i * 50)
+        if i == difficultyMenuSelection then
+            love.graphics.setColor(1, 1, 0, 1)  -- Highlight selected
+            love.graphics.print("> " .. diff .. " <", (love.graphics.getWidth() - AmaticFont40:getWidth("> " .. diff .. " <"))/2, y)
+        else
+            love.graphics.setColor(0.5, 0.5, 0.5, 1)
+            love.graphics.print(diff, (love.graphics.getWidth() - AmaticFont40:getWidth(diff))/2, y)
+        end
+    end
+    
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.setFont(AmaticFont25)
+    love.graphics.print("Use UP/DOWN arrows to select, ENTER to start", (love.graphics.getWidth() - AmaticFont25:getWidth("Use UP/DOWN arrows to select, ENTER to start"))/2, 500)
     love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - AmaticFont25:getWidth(text3) - 10), (love.graphics.getHeight() - AmaticFont25:getHeight() - 10))
 end
 
@@ -668,11 +687,22 @@ function drawLoseScreen()
     local text1 = "Try again next time!"
     local text2 = string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount)
     local text3 = "Made by @gongahkia on Github in Love2D"
+    local roomCount = 0
+    for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
+    local elapsedGameTime = math.floor(love.timer.getTime() - stats.startTime)
+    
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.setFont(AmaticFont80)
-    love.graphics.print("Try again next time!", (love.graphics.getWidth() - AmaticFont80:getWidth(text1))/2, (love.graphics.getHeight() - AmaticFont80:getHeight(text))/2 - 100)
+    love.graphics.print("Try again next time!", (love.graphics.getWidth() - AmaticFont80:getWidth(text1))/2, 80)
     love.graphics.setFont(AmaticFont40)
-    love.graphics.print(string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount), (love.graphics.getWidth() - AmaticFont40:getWidth(text2))/2, 300)
+    love.graphics.print(string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount), (love.graphics.getWidth() - AmaticFont40:getWidth(text2))/2, 200)
+    
+    -- Display statistics
+    love.graphics.setFont(AmaticFont25)
+    local statsText = string.format("Time: %d seconds | Rooms: %d | Items: %d", elapsedGameTime, roomCount, stats.itemsUsed)
+    love.graphics.print(statsText, (love.graphics.getWidth() - AmaticFont25:getWidth(statsText))/2, 260)
+    love.graphics.print("Difficulty: " .. CONFIG.DIFFICULTY, (love.graphics.getWidth() - AmaticFont25:getWidth("Difficulty: " .. CONFIG.DIFFICULTY))/2, 290)
+    
     love.graphics.setFont(AmaticFont25)
     love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - AmaticFont25:getWidth(text3) - 10), (love.graphics.getHeight() - AmaticFont25:getHeight() - 10))
 end
@@ -681,11 +711,34 @@ function drawWinScreen()
     local text1 = "You Win!"
     local text2 = string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount)
     local text3 = "Made by @gongahkia on Github in Love2D"
+    local roomCount = 0
+    for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
+    local elapsedGameTime = math.floor(love.timer.getTime() - stats.startTime)
+    
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.setFont(AmaticFont80)
-    love.graphics.print("You Win!", (love.graphics.getWidth() - AmaticFont80:getWidth(text1))/2, (love.graphics.getHeight() - AmaticFont80:getHeight(text))/2 - 100)
+    love.graphics.print("You Win!", (love.graphics.getWidth() - AmaticFont80:getWidth(text1))/2, 80)
     love.graphics.setFont(AmaticFont40)
-    love.graphics.print(string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount), (love.graphics.getWidth() - AmaticFont40:getWidth(text2))/2, 300)
+    love.graphics.print(string.format("You collected all %d keys!", world.key.globalCount), (love.graphics.getWidth() - AmaticFont40:getWidth(string.format("You collected all %d keys!", world.key.globalCount)))/2, 200)
+    
+    -- Display statistics
+    love.graphics.setFont(AmaticFont25)
+    local statsText = string.format("Time: %d seconds | Rooms: %d | Items: %d | Deaths: %d", elapsedGameTime, roomCount, stats.itemsUsed, stats.deaths)
+    love.graphics.print(statsText, (love.graphics.getWidth() - AmaticFont25:getWidth(statsText))/2, 260)
+    love.graphics.print("Difficulty: " .. CONFIG.DIFFICULTY, (love.graphics.getWidth() - AmaticFont25:getWidth("Difficulty: " .. CONFIG.DIFFICULTY))/2, 290)
+    
+    -- Grade system
+    local grade = "D"
+    if stats.deaths == 0 and elapsedGameTime < 120 then grade = "S"
+    elseif stats.deaths == 0 and elapsedGameTime < 180 then grade = "A"
+    elseif stats.deaths <= 1 and elapsedGameTime < 240 then grade = "B"
+    elseif stats.deaths <= 2 then grade = "C"
+    end
+    love.graphics.setFont(AmaticFont80)
+    love.graphics.setColor(1, 1, 0, 1)
+    love.graphics.print("Grade: " .. grade, (love.graphics.getWidth() - AmaticFont80:getWidth("Grade: " .. grade))/2, 340)
+    
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.setFont(AmaticFont25)
     love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - AmaticFont25:getWidth(text3) - 10), (love.graphics.getHeight() - AmaticFont25:getHeight() - 10))
 end
@@ -778,8 +831,43 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     math.randomseed(os.time())
 
     if currentMode == "titleScreen" then
+        
+        -- Handle difficulty selection
+        if love.keyboard.isDown("up") then
+            if not upPressed then
+                difficultyMenuSelection = math.max(1, difficultyMenuSelection - 1)
+                upPressed = true
+            end
+        else
+            upPressed = false
+        end
+        
+        if love.keyboard.isDown("down") then
+            if not downPressed then
+                difficultyMenuSelection = math.min(4, difficultyMenuSelection + 1)
+                downPressed = true
+            end
+        else
+            downPressed = false
+        end
 
         if love.keyboard.isDown("return") then
+            -- Apply difficulty settings
+            local difficultyNames = {"easy", "normal", "hard", "nightmare"}
+            local selectedDifficulty = difficultyNames[difficultyMenuSelection]
+            CONFIG.DIFFICULTY = selectedDifficulty
+            
+            local settings = CONFIG.DIFFICULTY_SETTINGS[selectedDifficulty]
+            CONFIG.MONSTER_SPEED = settings.monsterSpeed
+            CONFIG.PLAYER_SPEED = settings.playerSpeed
+            world.player.speed = settings.playerSpeed
+            world.monster.speed = settings.monsterSpeed
+            
+            if settings.fogEnabled then
+                CONFIG.FOG_ENABLED = true
+            end
+            
+            print("Starting game with difficulty: " .. selectedDifficulty)
             currentMode = "gameScreen"
         elseif love.keyboard.isDown("escape") then
             love.event.quit()
