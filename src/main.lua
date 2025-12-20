@@ -36,6 +36,9 @@ local world = {
     monster = {
         coord = {},
         speed = CONFIG.MONSTER_SPEED,
+        aiTypes = {}, -- stores AI type for each monster (1=chase, 2=patrol)
+        patrolPoints = {}, -- stores patrol waypoints for patrol-type monsters
+        currentWaypoint = {}, -- current waypoint index for each patrol monster
     },
 
     wall = {
@@ -261,6 +264,9 @@ function reset(tbl)
     tbl.player.alive = true
     tbl.monster.coord = {}
     tbl.monster.speed = CONFIG.MONSTER_SPEED
+    tbl.monster.aiTypes = {}
+    tbl.monster.patrolPoints = {}
+    tbl.monster.currentWaypoint = {}
     tbl.wall.coord = {}
     tbl.item.coord = {}
     tbl.item.buffSpeed = CONFIG.PLAYER_SPEED_BUFF
@@ -699,6 +705,64 @@ function hasBeenVisited(x, y)
     return visibilityMap[key] ~= nil and currentVisibleTiles[key] == nil
 end
 
+-- Ghost AI functions
+function initializeGhostAI()
+    -- Assign AI types to ghosts based on their index
+    for i, _ in ipairs(world.monster.coord) do
+        -- Alternate between chase (1) and patrol (2) AI
+        if i % 2 == 0 then
+            world.monster.aiTypes[i] = 2 -- Patrol
+            -- Create patrol waypoints
+            local patrolRadius = 3
+            world.monster.patrolPoints[i] = {
+                {world.monster.coord[i][1] - patrolRadius * CONFIG.TILE_SIZE, world.monster.coord[i][2]},
+                {world.monster.coord[i][1], world.monster.coord[i][2] - patrolRadius * CONFIG.TILE_SIZE},
+                {world.monster.coord[i][1] + patrolRadius * CONFIG.TILE_SIZE, world.monster.coord[i][2]},
+                {world.monster.coord[i][1], world.monster.coord[i][2] + patrolRadius * CONFIG.TILE_SIZE},
+            }
+            world.monster.currentWaypoint[i] = 1
+        else
+            world.monster.aiTypes[i] = 1 -- Chase
+        end
+    end
+end
+
+function moveGhostChase(monsterCoord, playerCoord, dt, speed)
+    local xOffset = playerCoord[1] - monsterCoord[1]
+    local yOffset = playerCoord[2] - monsterCoord[2]
+    local angle = math.atan2(yOffset, xOffset)
+    local dx = speed * math.cos(angle)
+    local dy = speed * math.sin(angle)
+    monsterCoord[1] = monsterCoord[1] + (dt * dx)
+    monsterCoord[2] = monsterCoord[2] + (dt * dy)
+end
+
+function moveGhostPatrol(monsterIndex, dt, speed)
+    local monsterCoord = world.monster.coord[monsterIndex]
+    local waypoints = world.monster.patrolPoints[monsterIndex]
+    local currentWP = world.monster.currentWaypoint[monsterIndex]
+    
+    if not waypoints or #waypoints == 0 then
+        return
+    end
+    
+    local targetWaypoint = waypoints[currentWP]
+    local xOffset = targetWaypoint[1] - monsterCoord[1]
+    local yOffset = targetWaypoint[2] - monsterCoord[2]
+    local distance = math.sqrt(xOffset * xOffset + yOffset * yOffset)
+    
+    -- If close to waypoint, move to next one
+    if distance < CONFIG.TILE_SIZE then
+        world.monster.currentWaypoint[monsterIndex] = (currentWP % #waypoints) + 1
+    else
+        local angle = math.atan2(yOffset, xOffset)
+        local dx = speed * 0.5 * math.cos(angle) -- Patrol slower than chase
+        local dy = speed * 0.5 * math.sin(angle)
+        monsterCoord[1] = monsterCoord[1] + (dt * dx)
+        monsterCoord[2] = monsterCoord[2] + (dt * dy)
+    end
+end
+
 -- FUA add and spruce up these screens
 function drawTitleScreen()
     local text1 = "TIKRIT"
@@ -810,6 +874,9 @@ function love.load() -- load function that runs once at the beginning
     openedDoorSpriteCoords = shallowCopy(doorList)
     addDoorAsWall(world,doorList)
     world.door.coord = doorList
+    
+    -- Initialize ghost AI
+    initializeGhostAI()
     
     -- Initialize statistics
     stats.startTime = love.timer.getTime()
@@ -981,6 +1048,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 visibilityMap = {}
                 currentVisibleTiles = {}
             end
+            
+            -- Reinitialize ghost AI for new room
+            initializeGhostAI()
 
             doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
             openedDoorSpriteCoords = shallowCopy(doorList)
@@ -1013,14 +1083,16 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
     -- MONSTER MOVEMENT
 
-        for _, monsterCoord in ipairs(monsters.coord) do
-            local xOffset = player.coord[1] - monsterCoord[1]
-            local yOffset = player.coord[2] - monsterCoord[2]
-            local angle = math.atan2(yOffset, xOffset) -- angle offset between ghost and player
-            local dx = monsters.speed * math.cos(angle) -- ghost horizontal movement in x direction
-            local dy = monsters.speed * math.sin(angle) -- ghost vertical movement in y direction
-            monsterCoord[1] = monsterCoord[1] + (dt * dx) -- moves ghosts towards player
-            monsterCoord[2] = monsterCoord[2] + (dt * dy)
+        for i, monsterCoord in ipairs(monsters.coord) do
+            local aiType = world.monster.aiTypes[i] or 1
+            
+            if aiType == 1 then
+                -- Chase behavior (aggressive)
+                moveGhostChase(monsterCoord, player.coord, dt, monsters.speed)
+            elseif aiType == 2 then
+                -- Patrol behavior (territorial)
+                moveGhostPatrol(i, dt, monsters.speed)
+            end
         end
 
     -- MONSTER PROXIMITY CHECK
@@ -1350,10 +1422,15 @@ function love.draw() -- draw function that runs once every frame
         -- love.graphics.setColor(1,0,0)
 
         if world.player.alive then 
-            for _, monsterCoord in ipairs(monsters) do
+            for i, monsterCoord in ipairs(monsters) do
                 if isVisible(monsterCoord[1], monsterCoord[2]) then
                     love.graphics.setColor(0.5, 0.5, 0.5, 1)
-                    love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2])
+                    local aiType = world.monster.aiTypes[i] or 1
+                    if aiType == 1 then
+                        love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2]) -- Chase ghost
+                    else
+                        love.graphics.draw(ghostSprite2, monsterCoord[1], monsterCoord[2]) -- Patrol ghost
+                    end
                 end
                 -- love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
             end 
@@ -1426,14 +1503,34 @@ function love.draw() -- draw function that runs once every frame
             
             -- AI pathfinding vectors
             if CONFIG.SHOW_AI_VECTORS and world.player.alive then
-                love.graphics.setColor(1, 0, 1, 0.7)
-                for _, monsterCoord in ipairs(monsters) do
-                    love.graphics.line(
-                        monsterCoord[1] + CONFIG.TILE_SIZE/2, 
-                        monsterCoord[2] + CONFIG.TILE_SIZE/2,
-                        playerCoord[1] + CONFIG.TILE_SIZE/2,
-                        playerCoord[2] + CONFIG.TILE_SIZE/2
-                    )
+                for i, monsterCoord in ipairs(monsters) do
+                    local aiType = world.monster.aiTypes[i] or 1
+                    
+                    if aiType == 1 then
+                        -- Chase AI - show line to player
+                        love.graphics.setColor(1, 0, 1, 0.7)
+                        love.graphics.line(
+                            monsterCoord[1] + CONFIG.TILE_SIZE/2, 
+                            monsterCoord[2] + CONFIG.TILE_SIZE/2,
+                            playerCoord[1] + CONFIG.TILE_SIZE/2,
+                            playerCoord[2] + CONFIG.TILE_SIZE/2
+                        )
+                    elseif aiType == 2 then
+                        -- Patrol AI - show patrol path
+                        love.graphics.setColor(0, 1, 1, 0.5)
+                        local waypoints = world.monster.patrolPoints[i]
+                        if waypoints then
+                            for j = 1, #waypoints do
+                                local nextJ = (j % #waypoints) + 1
+                                love.graphics.line(
+                                    waypoints[j][1] + CONFIG.TILE_SIZE/2,
+                                    waypoints[j][2] + CONFIG.TILE_SIZE/2,
+                                    waypoints[nextJ][1] + CONFIG.TILE_SIZE/2,
+                                    waypoints[nextJ][2] + CONFIG.TILE_SIZE/2
+                                )
+                            end
+                        end
+                    end
                 end
             end
             
