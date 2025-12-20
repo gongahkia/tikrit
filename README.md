@@ -6,6 +6,29 @@
 
 Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in [Lua](https://www.lua.org/) using Love2D over 5 days.
 
+## Features
+
+### Gameplay
+- **Four Difficulty Levels**: Easy, Normal, Hard, and Nightmare modes
+- **Fog of War System**: Limited vision radius with memory of previously visited areas
+- **Smart Ghost AI**: Two distinct AI behaviors (aggressive chase and territorial patrol)
+- **Dynamic Item Effects**: Random effects from potions (speed boost, invincibility, ghost slow, map reveal, etc.)
+- **Statistics Tracking**: Track completion time, rooms visited, items used, and deaths
+- **Grade System**: S/A/B/C/D ranking based on performance
+
+### Controls
+- **Movement**: WASD or Arrow Keys
+- **Debug Mode**: F3 (shows FPS, collision boxes, AI vectors, stats)
+- **God Mode**: F4 (disable collision for testing)
+- **Fog of War Toggle**: F5 (enable/disable during gameplay)
+- **Quit**: ESC
+
+### Developer Features
+- Configuration-driven design via `config.lua`
+- Debug visualization mode for development
+- Comprehensive statistics tracking
+- Modular AI system for easy expansion
+
 ## Installation
 
 ### CLI
