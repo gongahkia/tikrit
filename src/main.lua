@@ -5,6 +5,7 @@ local CONFIG = require("config")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
+local pauseMenuSelection = 1 -- 1=resume, 2=restart, 3=quit
 
 local elapsedTime = 0
 local debugMode = false
@@ -949,6 +950,37 @@ function drawWinScreen()
     love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - AmaticFont25:getWidth(text3) - 10), (love.graphics.getHeight() - AmaticFont25:getHeight() - 10))
 end
 
+function drawPauseScreen()
+    -- Draw semi-transparent overlay
+    love.graphics.setColor(0, 0, 0, 0.7)
+    love.graphics.rectangle("fill", 0, 0, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT)
+    
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setFont(AmaticFont80)
+    local titleText = "PAUSED"
+    love.graphics.print(titleText, (love.graphics.getWidth() - AmaticFont80:getWidth(titleText))/2, 100)
+    
+    -- Menu options
+    local options = {"Resume", "Restart", "Quit"}
+    love.graphics.setFont(AmaticFont40)
+    
+    for i, option in ipairs(options) do
+        local yPos = 250 + (i - 1) * 70
+        if i == pauseMenuSelection then
+            love.graphics.setColor(1, 1, 0, 1)
+            love.graphics.print("> " .. option .. " <", (love.graphics.getWidth() - AmaticFont40:getWidth("> " .. option .. " <"))/2, yPos)
+        else
+            love.graphics.setColor(0.7, 0.7, 0.7, 1)
+            love.graphics.print(option, (love.graphics.getWidth() - AmaticFont40:getWidth(option))/2, yPos)
+        end
+    end
+    
+    love.graphics.setFont(AmaticFont25)
+    love.graphics.setColor(0.7, 0.7, 0.7, 1)
+    love.graphics.print("Use UP/DOWN to select, ENTER to confirm", (love.graphics.getWidth() - AmaticFont25:getWidth("Use UP/DOWN to select, ENTER to confirm"))/2, 500)
+    love.graphics.print("Press P or ESC to resume", (love.graphics.getWidth() - AmaticFont25:getWidth("Press P or ESC to resume"))/2, 530)
+end
+
 -- ---------- EVENT LOOP ----------
 
 function love.load() -- load function that runs once at the beginning
@@ -1214,11 +1246,22 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
     -- PLAYER INPUT
 
+        -- player pause toggle
+        if love.keyboard.isDown("p") then
+            if not pPressed then
+                currentMode = "pauseScreen"
+                pPressed = true
+                love.audio.pause(playerWalkingSound)
+                love.audio.pause(ghostScreamSound)
+            end
+        else
+            pPressed = false
+        end
+
         -- player escape screen
 
         if love.keyboard.isDown("escape") then 
-            love.event.quit()
-            print("event loop ended")
+            currentMode = "pauseScreen"
         end
         
         -- debug mode toggle (F3)
@@ -1376,6 +1419,53 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         
         if love.keyboard.isDown("return") or love.keyboard.isDown("escape") then
             love.event.quit()
+        end
+    
+    elseif currentMode == "pauseScreen" then
+        
+        -- Handle pause menu selection
+        if love.keyboard.isDown("up") then
+            if not upPressed then
+                pauseMenuSelection = math.max(1, pauseMenuSelection - 1)
+                upPressed = true
+            end
+        else
+            upPressed = false
+        end
+        
+        if love.keyboard.isDown("down") then
+            if not downPressed then
+                pauseMenuSelection = math.min(3, pauseMenuSelection + 1)
+                downPressed = true
+            end
+        else
+            downPressed = false
+        end
+        
+        if love.keyboard.isDown("return") then
+            if pauseMenuSelection == 1 then
+                -- Resume
+                currentMode = "gameScreen"
+                love.audio.play(playerWalkingSound)
+            elseif pauseMenuSelection == 2 then
+                -- Restart (reload game)
+                love.load()
+                currentMode = "titleScreen"
+            elseif pauseMenuSelection == 3 then
+                -- Quit
+                love.event.quit()
+            end
+        end
+        
+        if love.keyboard.isDown("p") or love.keyboard.isDown("escape") then
+            if not pPressed and not escPressed then
+                currentMode = "gameScreen"
+                pPressed = true
+                escPressed = true
+            end
+        else
+            pPressed = false
+            escPressed = false
         end
 
     end
@@ -1590,6 +1680,29 @@ function love.draw() -- draw function that runs once every frame
 
         love.graphics.setShader()
         
+        -- DRAW HUD (always visible, not just debug mode)
+        if not debugMode then
+            love.graphics.setColor(0, 0, 0, 0.7)
+            love.graphics.rectangle("fill", 0, 0, 200, 100)
+            
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.setFont(AmaticFont25)
+            love.graphics.print("Keys: " .. world.player.overallKeyCount .. "/" .. world.key.globalCount, 10, 10)
+            love.graphics.print("Room: " .. world.player.currRoom, 10, 35)
+            
+            -- Show active effects
+            if activeEffects.invincibility then
+                love.graphics.setColor(1, 1, 0, 1)
+                love.graphics.print("Invincible!", 10, 60)
+            elseif activeEffects.ghostSlow then
+                love.graphics.setColor(0, 1, 1, 1)
+                love.graphics.print("Ghosts Slowed", 10, 60)
+            elseif activeEffects.mapReveal then
+                love.graphics.setColor(1, 0.5, 0, 1)
+                love.graphics.print("Map Revealed", 10, 60)
+            end
+        end
+        
         -- DRAW DEBUG OVERLAY
         if debugMode then
             love.graphics.setColor(1, 1, 1, 1)
@@ -1682,5 +1795,7 @@ function love.draw() -- draw function that runs once every frame
         drawWinScreen()
     elseif currentMode == "loseScreen" then
         drawLoseScreen()
+    elseif currentMode == "pauseScreen" then
+        drawPauseScreen()
     end
 end
