@@ -1,16 +1,27 @@
 -- ---------- PRESETS ----------
 
 -- local inspect = require("inspect")
+local CONFIG = require("config")
 
 local currentMode = "titleScreen"
 
 local elapsedTime = 0
+local debugMode = false
+local godMode = false
+
+local stats = {
+    startTime = 0,
+    roomsVisited = {},
+    keysCollected = 0,
+    deaths = 0,
+    itemsUsed = 0,
+}
 
 local world = {
 
     player = {
         coord = {0,0},
-        speed = 200,
+        speed = CONFIG.PLAYER_SPEED,
         keyCount = 0,
         currRoom = "1",
         overallKeyCount = 0,
@@ -19,7 +30,7 @@ local world = {
 
     monster = {
         coord = {},
-        speed = 50,
+        speed = CONFIG.MONSTER_SPEED,
     },
 
     wall = {
@@ -28,7 +39,7 @@ local world = {
 
     item = {
         coord = {},
-        buffSpeed = 200,
+        buffSpeed = CONFIG.PLAYER_SPEED_BUFF,
     },
 
     key = {
@@ -240,14 +251,14 @@ end
 -- resets table data except current room since that one needs to continue being tracked
 function reset(tbl)
     tbl.player.coord = {0,0}
-    tbl.player.speed = 200
+    tbl.player.speed = CONFIG.PLAYER_SPEED
     tbl.player.keyCount = 0
     tbl.player.alive = true
     tbl.monster.coord = {}
-    tbl.monster.speed = 50
+    tbl.monster.speed = CONFIG.MONSTER_SPEED
     tbl.wall.coord = {}
     tbl.item.coord = {}
-    tbl.item.buffSpeed = 200
+    tbl.item.buffSpeed = CONFIG.PLAYER_SPEED_BUFF
     tbl.key.coord = {}
     tbl.key.totalCount = 0
     tbl.door.coord = {}
@@ -255,11 +266,11 @@ function reset(tbl)
 end
 
 function checkCollision(ACoord, BCoord)
-    return ACoord[1] + 20 > BCoord[1] and ACoord[2] + 20 > BCoord[2] and BCoord[1] + 20 > ACoord[1] and BCoord[2] + 20 > ACoord[2]
+    return ACoord[1] + CONFIG.TILE_SIZE > BCoord[1] and ACoord[2] + CONFIG.TILE_SIZE > BCoord[2] and BCoord[1] + CONFIG.TILE_SIZE > ACoord[1] and BCoord[2] + CONFIG.TILE_SIZE > ACoord[2]
 end
 
 function checkPlayerOutBounds(playerCoord)
-    return playerCoord[1] < 0 or playerCoord[1] > 600 or playerCoord[2] < 0 or playerCoord[2] > 600
+    return playerCoord[1] < 0 or playerCoord[1] > CONFIG.MAP_WIDTH or playerCoord[2] < 0 or playerCoord[2] > CONFIG.MAP_HEIGHT
 end
 
 --[[ 
@@ -632,7 +643,7 @@ function ghostProxCheck(playerCoord, monsterCoords)
         table.insert(tem, manhattanDistance(player.coord, monsterCoord))
     end
     for _, val in ipairs(tem) do
-        if val <= 100 then
+        if val <= CONFIG.GHOST_PROXIMITY_THRESHOLD then
             return true
         end
     end
@@ -683,8 +694,8 @@ end
 
 function love.load() -- load function that runs once at the beginning
 
-    love.window.setTitle("tikrit")
-    love.window.setMode(600,600)
+    love.window.setTitle(CONFIG.WINDOW_TITLE)
+    love.window.setMode(CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT)
     randomiseMap("map/layout.txt")
     worldMap = generateMap("map/layout.txt")
     world.key.globalCount = totalKeys(worldMap)
@@ -698,6 +709,13 @@ function love.load() -- load function that runs once at the beginning
     openedDoorSpriteCoords = shallowCopy(doorList)
     addDoorAsWall(world,doorList)
     world.door.coord = doorList
+    
+    -- Initialize statistics
+    stats.startTime = love.timer.getTime()
+    stats.roomsVisited = {[world.player.currRoom] = true}
+    
+    debugMode = CONFIG.DEBUG_MODE
+    godMode = CONFIG.GOD_MODE
 
     -- print(inspect(worldMap))
     -- print(totalKeys(worldMap))
@@ -743,13 +761,14 @@ function love.load() -- load function that runs once at the beginning
 
     -- ---------- FONT LOADING ----------
 
-    AmaticFont80 = love.graphics.newFont("font/Amatic-Bold.ttf", 80)
-    AmaticFont40 = love.graphics.newFont("font/Amatic-Bold.ttf", 40)
-    AmaticFont25 = love.graphics.newFont("font/Amatic-Bold.ttf", 25)
+    AmaticFont80 = love.graphics.newFont("font/Amatic-Bold.ttf", CONFIG.FONT_SIZE_LARGE)
+    AmaticFont40 = love.graphics.newFont("font/Amatic-Bold.ttf", CONFIG.FONT_SIZE_MEDIUM)
+    AmaticFont25 = love.graphics.newFont("font/Amatic-Bold.ttf", CONFIG.FONT_SIZE_SMALL)
 
     -- ---------- LOADING IN PRESETS -----------
 
     ambientNoiseSound:setLooping(true)
+    ambientNoiseSound:setVolume(CONFIG.VOLUME_MUSIC)
     love.audio.play(ambientNoiseSound)
 
 end
@@ -815,6 +834,11 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             deserialize(string.format("map/%s.txt",nextRoom)) -- load new room data
             player.currRoom = nextRoom
             player.coord = playerLoc[2] -- new player location
+            
+            -- Track room visit
+            if not stats.roomsVisited[nextRoom] then
+                stats.roomsVisited[nextRoom] = true
+            end
 
             doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
             openedDoorSpriteCoords = shallowCopy(doorList)
@@ -832,9 +856,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
     -- ---------- ITEM EFFECT TIMEOUT ----------
 
-        if player.speed > 200 then
+        if player.speed > CONFIG.PLAYER_SPEED then
             elapsedTime = elapsedTime + dt
-            if elapsedTime > 5 then
+            if elapsedTime > CONFIG.PLAYER_SPEED_BUFF_DURATION then
                 player.speed = player.speed - items.buffSpeed
                 elapsedTime = 0
                 print("item wore off, player speed", player.speed)
@@ -879,6 +903,28 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             love.event.quit()
             print("event loop ended")
         end
+        
+        -- debug mode toggle (F3)
+        if love.keyboard.isDown("f3") then
+            if not f3Pressed then
+                debugMode = not debugMode
+                f3Pressed = true
+                print("Debug mode:", debugMode)
+            end
+        else
+            f3Pressed = false
+        end
+        
+        -- god mode toggle (F4)
+        if love.keyboard.isDown("f4") then
+            if not f4Pressed then
+                godMode = not godMode
+                f4Pressed = true
+                print("God mode:", godMode)
+            end
+        else
+            f4Pressed = false
+        end
 
         -- PLAYER MOVEMENT
 
@@ -915,7 +961,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             for _, wallCoord in ipairs(walls.coord) do
                 if checkCollision(wallCoord, player.coord) then
-                    player.coord[1], player.coord[2] = storedX, storedY         
+                    if not godMode then
+                        player.coord[1], player.coord[2] = storedX, storedY
+                    end
                 end
             end
 
@@ -923,7 +971,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             for _, doorCoord in ipairs(doors.coord) do
                 if checkCollision(doorCoord, player.coord) then
-                    player.coord[1], player.coord[2] = storedX, storedY 
+                    if not godMode then
+                        player.coord[1], player.coord[2] = storedX, storedY
+                    end
                 end
             end
 
@@ -931,10 +981,13 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             for _, monsterCoord in ipairs(monsters.coord) do
                 if checkCollision(monsterCoord, player.coord) then
-                    player.coord[1], player.coord[2] = storedX, storedY
-                    player.alive = false
-                    print("player died")
-                    love.audio.play(playerDeathSound)
+                    if not godMode then
+                        player.coord[1], player.coord[2] = storedX, storedY
+                        player.alive = false
+                        stats.deaths = stats.deaths + 1
+                        print("player died")
+                        love.audio.play(playerDeathSound)
+                    end
                     -- love.event.quit()
                 end
             end
@@ -945,6 +998,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 if checkCollision(itemCoord, player.coord) then
                     player.speed = player.speed + items.buffSpeed
                     table.remove(items.coord, i)
+                    stats.itemsUsed = stats.itemsUsed + 1
                     print("item picked up, player speed increased" , player.speed)
                     love.audio.play(playerItemSound)
                 end
@@ -958,6 +1012,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                     table.remove(keys.coord, q)
                     player.keyCount = player.keyCount + 1
                     player.overallKeyCount = player.overallKeyCount + 1
+                    stats.keysCollected = stats.keysCollected + 1
                     print("key picked up", player.keyCount)
                     love.audio.play(playerKeySound)
 
@@ -1125,6 +1180,56 @@ function love.draw() -- draw function that runs once every frame
         -- love.graphics.rectangle("fill", playerCoord[1], playerCoord[2], 20, 20)
 
         love.graphics.setShader()
+        
+        -- DRAW DEBUG OVERLAY
+        if debugMode then
+            love.graphics.setColor(1, 1, 1, 1)
+            
+            -- FPS counter
+            if CONFIG.SHOW_FPS then
+                love.graphics.setFont(AmaticFont25)
+                love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
+                love.graphics.print("God Mode: " .. tostring(godMode), 10, 35)
+            end
+            
+            -- Collision boxes
+            if CONFIG.SHOW_COLLISION_BOXES then
+                love.graphics.setColor(1, 0, 0, 0.5)
+                for _, wallCoord in ipairs(walls) do
+                    love.graphics.rectangle("line", wallCoord[1], wallCoord[2], CONFIG.TILE_SIZE, CONFIG.TILE_SIZE)
+                end
+                
+                love.graphics.setColor(1, 1, 0, 0.5)
+                for _, doorCoord in ipairs(doors) do
+                    love.graphics.rectangle("line", doorCoord[1], doorCoord[2], CONFIG.TILE_SIZE, CONFIG.TILE_SIZE)
+                end
+                
+                love.graphics.setColor(0, 1, 0, 0.8)
+                love.graphics.rectangle("line", playerCoord[1], playerCoord[2], CONFIG.TILE_SIZE, CONFIG.TILE_SIZE)
+            end
+            
+            -- AI pathfinding vectors
+            if CONFIG.SHOW_AI_VECTORS and world.player.alive then
+                love.graphics.setColor(1, 0, 1, 0.7)
+                for _, monsterCoord in ipairs(monsters) do
+                    love.graphics.line(
+                        monsterCoord[1] + CONFIG.TILE_SIZE/2, 
+                        monsterCoord[2] + CONFIG.TILE_SIZE/2,
+                        playerCoord[1] + CONFIG.TILE_SIZE/2,
+                        playerCoord[2] + CONFIG.TILE_SIZE/2
+                    )
+                end
+            end
+            
+            -- Statistics
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.setFont(AmaticFont25)
+            local roomCount = 0
+            for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
+            love.graphics.print("Rooms: " .. roomCount, 10, 60)
+            love.graphics.print("Keys: " .. world.player.overallKeyCount .. "/" .. world.key.globalCount, 10, 85)
+            love.graphics.print("Speed: " .. world.player.speed, 10, 110)
+        end
 
     elseif currentMode == "winScreen" then
         drawWinScreen()

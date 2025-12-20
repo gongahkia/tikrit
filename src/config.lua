@@ -1,0 +1,94 @@
+-- ---------- CONFIGURATION ----------
+-- All game constants and configurable values
+-- This allows easy tweaking without modifying core game code
+
+local CONFIG = {}
+
+-- ---------- GAMEPLAY SETTINGS ----------
+
+-- Player settings
+CONFIG.PLAYER_SPEED = 200
+CONFIG.PLAYER_SPEED_BUFF = 200
+CONFIG.PLAYER_SPEED_BUFF_DURATION = 5 -- seconds
+
+-- Monster settings
+CONFIG.MONSTER_SPEED = 50
+CONFIG.GHOST_PROXIMITY_THRESHOLD = 100 -- distance for ghost scream sound
+
+-- Map settings
+CONFIG.TILE_SIZE = 20
+CONFIG.MAP_WIDTH = 600
+CONFIG.MAP_HEIGHT = 600
+CONFIG.MAX_ROOMS = 9
+CONFIG.MIN_ROOMS = 3
+
+-- Vision settings (for fog of war)
+CONFIG.VISION_RADIUS = 7 -- tiles
+CONFIG.FOG_ENABLED = false -- toggle fog of war
+CONFIG.SHOW_VISITED = true -- show previously visited areas
+CONFIG.VISITED_ALPHA = 0.3 -- transparency for visited areas
+
+-- Debug settings
+CONFIG.DEBUG_MODE = false -- toggle with F3
+CONFIG.GOD_MODE = false -- toggle with F4 (no collision)
+CONFIG.SHOW_FPS = true
+CONFIG.SHOW_COLLISION_BOXES = true
+CONFIG.SHOW_AI_VECTORS = true
+
+-- Difficulty settings (affects spawn rates and speeds)
+CONFIG.DIFFICULTY = "normal" -- easy, normal, hard, nightmare
+CONFIG.DIFFICULTY_SETTINGS = {
+    easy = {
+        monsterSpeed = 35,
+        playerSpeed = 250,
+        itemSpawnMultiplier = 1.5,
+        requiredKeyPercentage = 0.6
+    },
+    normal = {
+        monsterSpeed = 50,
+        playerSpeed = 200,
+        itemSpawnMultiplier = 1.0,
+        requiredKeyPercentage = 1.0
+    },
+    hard = {
+        monsterSpeed = 70,
+        playerSpeed = 180,
+        itemSpawnMultiplier = 0.7,
+        requiredKeyPercentage = 1.0
+    },
+    nightmare = {
+        monsterSpeed = 90,
+        playerSpeed = 150,
+        itemSpawnMultiplier = 0.4,
+        requiredKeyPercentage = 1.0,
+        fogEnabled = true,
+        permadeath = true
+    }
+}
+
+-- ---------- VISUAL SETTINGS ----------
+
+CONFIG.WINDOW_TITLE = "tikrit"
+CONFIG.WINDOW_WIDTH = 600
+CONFIG.WINDOW_HEIGHT = 600
+CONFIG.BACKGROUND_GRAY = 0.5
+
+-- ---------- AUDIO SETTINGS ----------
+
+CONFIG.VOLUME_MASTER = 1.0
+CONFIG.VOLUME_MUSIC = 0.7
+CONFIG.VOLUME_SFX = 1.0
+
+-- ---------- UI SETTINGS ----------
+
+CONFIG.FONT_SIZE_LARGE = 80
+CONFIG.FONT_SIZE_MEDIUM = 40
+CONFIG.FONT_SIZE_SMALL = 25
+
+-- ---------- STATISTICS TRACKING ----------
+
+CONFIG.TRACK_STATS = true
+CONFIG.STATS_FILE = "stats.txt"
+CONFIG.HIGH_SCORES_FILE = "highscores.txt"
+
+return CONFIG
