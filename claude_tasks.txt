@@ -3,7 +3,7 @@
 # Focus: Industry-relevant features, educational value, roguelike design patterns
 # Philosophy: Keep it simple, reuse existing assets, demonstrate best practices
 
-# IMPLEMENTATION STATUS: 13/34 recommendations completed as of 2024-12-22
+# IMPLEMENTATION STATUS: 14/34 recommendations completed as of 2024-12-22
 # See CHANGELOG.md for detailed implementation notes
 
 ================================================================================
@@ -17,6 +17,7 @@ COMPLETED FEATURES (✅)
 8. Modular Code Refactoring (Recommendation #8)
 9. Configuration-Driven Design (Recommendation #9)
 10. Debug Visualization Mode (Recommendation #10)
+16. Combat System (Recommendation #16)
 18. Particle Effects System (Recommendation #18)
 19. Screen Shake & Camera Effects (Recommendation #19)
 20. Animation System (Recommendation #20)
@@ -340,8 +341,9 @@ SECTION C: ROGUELIKE GENRE FEATURES
     Code Location: main.lua:944-951 (item pickup)
     Suggested Approach: Add inventory table, modify item collection logic
 
-16. COMBAT SYSTEM (OPTIONAL)
+16. COMBAT SYSTEM (OPTIONAL) ✅ COMPLETED
     Priority: LOW | Difficulty: High | Asset Reuse: 60%
+    Status: Spacebar attacks, 3HP monsters, cooldowns, loot drops implemented
 
     Implementation:
     - Simple attack: Spacebar to attack in facing direction
