@@ -3,7 +3,7 @@
 # Focus: Industry-relevant features, educational value, roguelike design patterns
 # Philosophy: Keep it simple, reuse existing assets, demonstrate best practices
 
-# IMPLEMENTATION STATUS: 8/34 recommendations completed as of 2024-12-21
+# IMPLEMENTATION STATUS: 10/34 recommendations completed as of 2024-12-21
 # See CHANGELOG.md for detailed implementation notes
 
 ================================================================================
@@ -16,6 +16,8 @@ COMPLETED FEATURES (✅)
 5. Difficulty Selection System (Recommendation #5)
 9. Configuration-Driven Design (Recommendation #9)
 10. Debug Visualization Mode (Recommendation #10)
+18. Particle Effects System (Recommendation #18)
+19. Screen Shake & Camera Effects (Recommendation #19)
 22. Improved UI/UX (Recommendation #22)
 
 For full implementation details, see:
@@ -374,8 +376,9 @@ SECTION C: ROGUELIKE GENRE FEATURES
 SECTION D: POLISH & GAME FEEL
 ================================================================================
 
-18. PARTICLE EFFECT SYSTEM
+18. PARTICLE EFFECT SYSTEM ✅ COMPLETED
     Priority: MEDIUM | Difficulty: Medium | Asset Reuse: 80%
+    Status: Implemented particle effects for key, item, death, and door events
 
     Implementation:
     - Key collection: Gold sparkles (recolored sprites)
@@ -393,8 +396,9 @@ SECTION D: POLISH & GAME FEEL
     Code Location: main.lua:990-1134 (love.draw)
     Suggested Approach: Use Love2D's particle system, create effect definitions
 
-19. SCREEN SHAKE & CAMERA EFFECTS
+19. SCREEN SHAKE & CAMERA EFFECTS ✅ COMPLETED
     Priority: LOW | Difficulty: Low | Asset Reuse: 100%
+    Status: Screen shake on death and monster collisions with configurable intensity
 
     Implementation:
     - Ghost collision: Screen shake
