@@ -10,6 +10,7 @@ local Effects = require("modules/effects")
 local UI = require("modules/ui")
 local Animation = require("modules/animation")
 local Audio = require("modules/audio")
+local Combat = require("modules/combat")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -18,6 +19,10 @@ local pauseMenuSelection = 1 -- 1=resume, 2=restart, 3=quit
 local elapsedTime = 0
 local debugMode = false
 local godMode = false
+
+-- Player last movement for attack direction
+local lastMoveX = 0
+local lastMoveY = 1  -- Default facing down
 
 -- Item effects tracking
 local activeEffects = {
@@ -1109,6 +1114,9 @@ function love.load() -- load function that runs once at the beginning
     Animation.init()
     Animation.initGhostBobbing(#world.monster.coord)
     
+    -- Initialize combat
+    Combat.init(#world.monster.coord)
+    
     -- Initialize statistics
     stats.startTime = love.timer.getTime()
     stats.roomsVisited = {[world.player.currRoom] = true}
@@ -1288,6 +1296,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             -- Reinitialize ghost AI for new room
             AI.initializeGhosts(world)
             Animation.initGhostBobbing(#world.monster.coord)
+            Combat.init(#world.monster.coord)
 
             doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
             openedDoorSpriteCoords = shallowCopy(doorList)
@@ -1314,6 +1323,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         
         -- Update animations
         Animation.update(dt)
+        
+        -- Update combat
+        Combat.update(dt)
         
         -- Update ambient music volume based on game state
         if CONFIG.POSITIONAL_AUDIO_ENABLED then
@@ -1425,17 +1437,39 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         if player.alive then
 
             storedX, storedY = player.coord[1], player.coord[2]
+            local moved = false
 
             if love.keyboard.isDown("w") or love.keyboard.isDown("up") then 
                 player.coord[2] = player.coord[2] - (dt * player.speed)
+                lastMoveX, lastMoveY = 0, -1
+                moved = true
             elseif love.keyboard.isDown("s") or love.keyboard.isDown("down") then 
                 player.coord[2] = player.coord[2] + (dt * player.speed)
+                lastMoveX, lastMoveY = 0, 1
+                moved = true
             end
 
             if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
                 player.coord[1] = player.coord[1] - (dt * player.speed)
+                lastMoveX, lastMoveY = -1, 0
+                moved = true
             elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
                 player.coord[1] = player.coord[1] + (dt * player.speed)
+                lastMoveX, lastMoveY = 1, 0
+                moved = true
+            end
+            
+            -- Attack input (spacebar)
+            if CONFIG.COMBAT_ENABLED and love.keyboard.isDown("space") then
+                if not spacePressed then
+                    if Combat.tryAttack(player.coord[1], player.coord[2], lastMoveX, lastMoveY) then
+                        print("Player attacks!")
+                        -- Handle attack hits below in collision section
+                    end
+                    spacePressed = true
+                end
+            else
+                spacePressed = false
             end
 
             if love.keyboard.isDown("w", "up", "s", "down", "a", "left", "d", "right") then
@@ -1473,6 +1507,53 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
         -- player and monster
 
+            -- Check attack hits first
+            if CONFIG.COMBAT_ENABLED and Combat.isCurrentlyAttacking() then
+                local attackBox = Combat.getAttackHitbox(player.coord[1], player.coord[2])
+                
+                for i = #monsters.coord, 1, -1 do
+                    local monsterCoord = monsters.coord[i]
+                    if Combat.checkAttackHit(attackBox, monsterCoord[1], monsterCoord[2]) then
+                        local isDead = Combat.damageMonster(i)
+                        Effects.startScreenShake(5, 0.2)
+                        
+                        if isDead then
+                            print("Monster " .. i .. " defeated!")
+                            Effects.spawn(monsterCoord[1], monsterCoord[2], "death")
+                            
+                            -- Drop loot (key or item)
+                            math.randomseed(os.time() + i)
+                            local dropRoll = math.random()
+                            if dropRoll < CONFIG.DROP_CHANCE_KEY then
+                                table.insert(world.key.coord, {monsterCoord[1], monsterCoord[2]})
+                                world.key.totalCount = world.key.totalCount + 1
+                                world.key.globalCount = world.key.globalCount + 1
+                                print("Monster dropped a key!")
+                            elseif dropRoll < CONFIG.DROP_CHANCE_KEY + CONFIG.DROP_CHANCE_ITEM then
+                                table.insert(world.item.coord, {monsterCoord[1], monsterCoord[2]})
+                                print("Monster dropped an item!")
+                            end
+                            
+                            -- Remove monster
+                            table.remove(world.monster.coord, i)
+                            table.remove(world.monster.aiTypes, i)
+                            if world.monster.patrolPoints[i] then
+                                table.remove(world.monster.patrolPoints, i)
+                            end
+                            if world.monster.currentWaypoint[i] then
+                                table.remove(world.monster.currentWaypoint, i)
+                            end
+                            Combat.removeMonster(i)
+                        else
+                            print("Monster " .. i .. " hit! Health: " .. Combat.getMonsterHealth(i))
+                        end
+                        
+                        break  -- Only hit one monster per attack
+                    end
+                end
+            end
+            
+            -- Then check collision damage
             for _, monsterCoord in ipairs(monsters.coord) do
                 if checkCollision(monsterCoord, player.coord) then
                     if not godMode and not Effects.activeEffects.invincibility then
