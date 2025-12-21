@@ -9,6 +9,7 @@ local AI = require("modules/ai")
 local Effects = require("modules/effects")
 local UI = require("modules/ui")
 local Animation = require("modules/animation")
+local Audio = require("modules/audio")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -1313,6 +1314,18 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         
         -- Update animations
         Animation.update(dt)
+        
+        -- Update ambient music volume based on game state
+        if CONFIG.POSITIONAL_AUDIO_ENABLED then
+            local closestGhostDist = math.huge
+            for _, monsterCoord in ipairs(monsters.coord) do
+                local dist = Audio.calculateDistance(player.coord[1], player.coord[2], monsterCoord[1], monsterCoord[2])
+                if dist < closestGhostDist then
+                    closestGhostDist = dist
+                end
+            end
+            Audio.updateAmbientMusic(ambientNoiseSound, player.alive, closestGhostDist)
+        end
 
         if player.speed > CONFIG.PLAYER_SPEED then
             elapsedTime = elapsedTime + dt
@@ -1330,16 +1343,22 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     -- MONSTER MOVEMENT
         AI.updateMonsters(world, player.coord, dt, monsters.speed, Effects.activeEffects.ghostSlow)
 
-    -- MONSTER PROXIMITY CHECK
+    -- MONSTER PROXIMITY CHECK & POSITIONAL AUDIO
 
         if player.alive then
-            if ghostProxCheck(player.coord, monsters.coord) then
-                if not ghostScreamSound:isPlaying() then
-                    love.audio.play(ghostScreamSound)
-                end
+            if CONFIG.POSITIONAL_AUDIO_ENABLED then
+                -- Use positional audio system
+                Audio.updateGhostAudio(ghostScreamSound, player.coord, monsters.coord)
             else
-                if ghostScreamSound:isPlaying() then
-                    love.audio.stop(ghostScreamSound)
+                -- Original proximity check (simple on/off)
+                if ghostProxCheck(player.coord, monsters.coord) then
+                    if not ghostScreamSound:isPlaying() then
+                        love.audio.play(ghostScreamSound)
+                    end
+                else
+                    if ghostScreamSound:isPlaying() then
+                        love.audio.stop(ghostScreamSound)
+                    end
                 end
             end
         end
