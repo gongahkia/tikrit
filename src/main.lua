@@ -3,6 +3,12 @@
 -- local inspect = require("inspect")
 local CONFIG = require("config")
 
+-- Modular imports
+local Utils = require("modules/utils")
+local AI = require("modules/ai")
+local Effects = require("modules/effects")
+local UI = require("modules/ui")
+
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
 local pauseMenuSelection = 1 -- 1=resume, 2=restart, 3=quit
@@ -1095,7 +1101,7 @@ function love.load() -- load function that runs once at the beginning
     world.door.coord = doorList
     
     -- Initialize ghost AI
-    initializeGhostAI()
+    AI.initializeGhosts(world)
     
     -- Initialize statistics
     stats.startTime = love.timer.getTime()
@@ -1152,45 +1158,10 @@ function love.load() -- load function that runs once at the beginning
     AmaticFont40 = love.graphics.newFont("font/Amatic-Bold.ttf", CONFIG.FONT_SIZE_MEDIUM)
     AmaticFont25 = love.graphics.newFont("font/Amatic-Bold.ttf", CONFIG.FONT_SIZE_SMALL)
 
-    -- ---------- PARTICLE SYSTEM LOADING ----------
-
-    local particleImage = createParticleImage()
+    -- ---------- MODULE INITIALIZATION ----------
     
-    -- Key collection particles (gold sparkles)
-    particleSystems.key = love.graphics.newParticleSystem(particleImage, CONFIG.PARTICLE_COUNT_KEY)
-    particleSystems.key:setParticleLifetime(0.5, CONFIG.PARTICLE_LIFETIME)
-    particleSystems.key:setLinearAcceleration(-50, -50, 50, 50)
-    particleSystems.key:setColors(1, 1, 0, 1, 1, 1, 0, 0) -- Gold to transparent
-    particleSystems.key:setSizes(3, 1)
-    particleSystems.key:setSpeed(50, 100)
-    particleSystems.key:setSpread(math.pi * 2)
-    
-    -- Item pickup particles (blue/cyan sparkles)
-    particleSystems.item = love.graphics.newParticleSystem(particleImage, CONFIG.PARTICLE_COUNT_ITEM)
-    particleSystems.item:setParticleLifetime(0.3, 0.8)
-    particleSystems.item:setLinearAcceleration(-30, -30, 30, 30)
-    particleSystems.item:setColors(0, 1, 1, 1, 0, 0.5, 1, 0) -- Cyan to transparent
-    particleSystems.item:setSizes(2, 0.5)
-    particleSystems.item:setSpeed(40, 80)
-    particleSystems.item:setSpread(math.pi * 2)
-    
-    -- Death particles (red burst)
-    particleSystems.death = love.graphics.newParticleSystem(particleImage, CONFIG.PARTICLE_COUNT_DEATH)
-    particleSystems.death:setParticleLifetime(0.8, 1.5)
-    particleSystems.death:setLinearAcceleration(-20, -20, 20, 20)
-    particleSystems.death:setColors(1, 0, 0, 1, 0.5, 0, 0, 0) -- Red to dark transparent
-    particleSystems.death:setSizes(4, 1)
-    particleSystems.death:setSpeed(60, 120)
-    particleSystems.death:setSpread(math.pi * 2)
-    
-    -- Door open particles (dust cloud)
-    particleSystems.door = love.graphics.newParticleSystem(particleImage, CONFIG.PARTICLE_COUNT_DOOR)
-    particleSystems.door:setParticleLifetime(0.5, 1.0)
-    particleSystems.door:setLinearAcceleration(-10, -10, 10, 10)
-    particleSystems.door:setColors(0.6, 0.6, 0.6, 0.8, 0.4, 0.4, 0.4, 0) -- Gray to transparent
-    particleSystems.door:setSizes(2, 3)
-    particleSystems.door:setSpeed(20, 40)
-    particleSystems.door:setSpread(math.pi * 2)
+    -- Initialize particle systems and effects
+    Effects.init()
 
     -- ---------- LOADING IN PRESETS -----------
 
@@ -1309,7 +1280,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             end
             
             -- Reinitialize ghost AI for new room
-            initializeGhostAI()
+            AI.initializeGhosts(world)
 
             doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
             openedDoorSpriteCoords = shallowCopy(doorList)
@@ -1328,11 +1299,11 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     -- ---------- ITEM EFFECT TIMEOUT ----------
 
         -- Update all active item effects
-        updateItemEffects(dt)
+        Effects.updateItemEffects(dt)
         
         -- Update particles and screen shake
-        updateParticles(dt)
-        updateScreenShake(dt)
+        Effects.updateParticles(dt)
+        Effects.updateScreenShake(dt)
 
         if player.speed > CONFIG.PLAYER_SPEED then
             elapsedTime = elapsedTime + dt
@@ -1348,24 +1319,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     -- ---------- ENTITY MOVEMENT -----------
 
     -- MONSTER MOVEMENT
-
-        for i, monsterCoord in ipairs(monsters.coord) do
-            local aiType = world.monster.aiTypes[i] or 1
-            local effectiveSpeed = monsters.speed
-            
-            -- Apply ghost slow effect
-            if activeEffects.ghostSlow then
-                effectiveSpeed = effectiveSpeed * CONFIG.GHOST_SLOW_MULTIPLIER
-            end
-            
-            if aiType == 1 then
-                -- Chase behavior (aggressive)
-                moveGhostChase(monsterCoord, player.coord, dt, effectiveSpeed)
-            elseif aiType == 2 then
-                -- Patrol behavior (territorial)
-                moveGhostPatrol(i, dt, effectiveSpeed)
-            end
-        end
+        AI.updateMonsters(world, player.coord, dt, monsters.speed, Effects.activeEffects.ghostSlow)
 
     -- MONSTER PROXIMITY CHECK
 
@@ -1493,18 +1447,18 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             for _, monsterCoord in ipairs(monsters.coord) do
                 if checkCollision(monsterCoord, player.coord) then
-                    if not godMode and not activeEffects.invincibility then
+                    if not godMode and not Effects.activeEffects.invincibility then
                         player.coord[1], player.coord[2] = storedX, storedY
                         player.alive = false
                         stats.deaths = stats.deaths + 1
-                        spawnParticles(player.coord[1], player.coord[2], "death")
-                        startScreenShake(10, 0.5)
+                        Effects.spawn(player.coord[1], player.coord[2], "death")
+                        Effects.startScreenShake(10, 0.5)
                         print("player died")
                         love.audio.play(playerDeathSound)
-                    elseif activeEffects.invincibility then
+                    elseif Effects.activeEffects.invincibility then
                         -- Just bounce back but don't die
                         player.coord[1], player.coord[2] = storedX, storedY
-                        startScreenShake(3, 0.2) -- Lighter shake when invincible
+                        Effects.startScreenShake(3, 0.2) -- Lighter shake when invincible
                     end
                     -- love.event.quit()
                 end
@@ -1514,8 +1468,8 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             for i, itemCoord in ipairs(items.coord) do 
                 if checkCollision(itemCoord, player.coord) then
-                    spawnParticles(itemCoord[1], itemCoord[2], "item")
-                    applyRandomItemEffect()
+                    Effects.spawn(itemCoord[1], itemCoord[2], "item")
+                    Effects.applyRandomItemEffect(world)
                     table.remove(items.coord, i)
                     stats.itemsUsed = stats.itemsUsed + 1
                     love.audio.play(playerItemSound)
@@ -1527,7 +1481,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             for q, keyCoord in ipairs(keys.coord) do
                 if checkCollision(keyCoord, player.coord) then
                     
-                    spawnParticles(keyCoord[1], keyCoord[2], "key")
+                    Effects.spawn(keyCoord[1], keyCoord[2], "key")
                     table.remove(keys.coord, q)
                     player.keyCount = player.keyCount + 1
                     player.overallKeyCount = player.overallKeyCount + 1
@@ -1541,7 +1495,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                         doors.coord = {}
                         -- Spawn door particles for all opened doors
                         for _, doorCoord in ipairs(openedDoorSpriteCoords) do
-                            spawnParticles(doorCoord[1], doorCoord[2], "door")
+                            Effects.spawn(doorCoord[1], doorCoord[2], "door")
                         end
                     end
 
@@ -1623,7 +1577,7 @@ function love.draw() -- draw function that runs once every frame
     math.randomseed(os.time())
 
     if currentMode == "titleScreen" then
-        drawTitleScreen()
+        UI.drawTitleScreen(difficultyMenuSelection, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25})
     elseif currentMode == "gameScreen" then -- draw game
 
         playerCoord = world.player.coord
@@ -1637,8 +1591,8 @@ function love.draw() -- draw function that runs once every frame
         
         -- Apply screen shake
         love.graphics.push()
-        if screenShake.active then
-            love.graphics.translate(screenShake.offsetX, screenShake.offsetY)
+        if Effects.screenShake.active then
+            love.graphics.translate(Effects.screenShake.offsetX, Effects.screenShake.offsetY)
         end
 
         -- SETS OVERLAYS AND SHADERS
@@ -1810,7 +1764,7 @@ function love.draw() -- draw function that runs once every frame
 
         if world.player.alive then
             -- Apply color based on active effects
-            if activeEffects.invincibility then
+            if Effects.activeEffects.invincibility then
                 -- Flash yellow/white for invincibility
                 local flash = math.sin(love.timer.getTime() * 10) > 0
                 if flash then
@@ -1833,30 +1787,10 @@ function love.draw() -- draw function that runs once every frame
         love.graphics.setShader()
         
         -- DRAW PARTICLES (under screen shake)
-        drawParticles()
+        Effects.drawParticles()
         
         -- DRAW HUD (always visible, not just debug mode)
-        if not debugMode then
-            love.graphics.setColor(0, 0, 0, 0.7)
-            love.graphics.rectangle("fill", 0, 0, 200, 100)
-            
-            love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.setFont(AmaticFont25)
-            love.graphics.print("Keys: " .. world.player.overallKeyCount .. "/" .. world.key.globalCount, 10, 10)
-            love.graphics.print("Room: " .. world.player.currRoom, 10, 35)
-            
-            -- Show active effects
-            if activeEffects.invincibility then
-                love.graphics.setColor(1, 1, 0, 1)
-                love.graphics.print("Invincible!", 10, 60)
-            elseif activeEffects.ghostSlow then
-                love.graphics.setColor(0, 1, 1, 1)
-                love.graphics.print("Ghosts Slowed", 10, 60)
-            elseif activeEffects.mapReveal then
-                love.graphics.setColor(1, 0.5, 0, 1)
-                love.graphics.print("Map Revealed", 10, 60)
-            end
-        end
+        UI.drawHUD(world, Effects.activeEffects, debugMode, {small = AmaticFont25})
         
         -- DRAW DEBUG OVERLAY
         if debugMode then
@@ -1929,19 +1863,19 @@ function love.draw() -- draw function that runs once every frame
             
             -- Active effects
             local yPos = 135
-            if activeEffects.invincibility then
+            if Effects.activeEffects.invincibility then
                 love.graphics.setColor(1, 1, 0, 1)
-                love.graphics.print(string.format("Invincible: %.1fs", activeEffects.invincibilityTimer), 10, yPos)
+                love.graphics.print(string.format("Invincible: %.1fs", Effects.activeEffects.invincibilityTimer), 10, yPos)
                 yPos = yPos + 25
             end
-            if activeEffects.ghostSlow then
+            if Effects.activeEffects.ghostSlow then
                 love.graphics.setColor(0, 1, 1, 1)
-                love.graphics.print(string.format("Ghosts Slowed: %.1fs", activeEffects.ghostSlowTimer), 10, yPos)
+                love.graphics.print(string.format("Ghosts Slowed: %.1fs", Effects.activeEffects.ghostSlowTimer), 10, yPos)
                 yPos = yPos + 25
             end
-            if activeEffects.mapReveal then
+            if Effects.activeEffects.mapReveal then
                 love.graphics.setColor(1, 0.5, 0, 1)
-                love.graphics.print(string.format("Map Reveal: %.1fs", activeEffects.mapRevealTimer), 10, yPos)
+                love.graphics.print(string.format("Map Reveal: %.1fs", Effects.activeEffects.mapRevealTimer), 10, yPos)
                 yPos = yPos + 25
             end
         end
@@ -1950,10 +1884,10 @@ function love.draw() -- draw function that runs once every frame
         love.graphics.pop()
 
     elseif currentMode == "winScreen" then
-        drawWinScreen()
+        UI.drawWinScreen(world, stats, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25})
     elseif currentMode == "loseScreen" then
-        drawLoseScreen()
+        UI.drawLoseScreen(world, stats, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25})
     elseif currentMode == "pauseScreen" then
-        drawPauseScreen()
+        UI.drawPauseScreen(pauseMenuSelection, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25})
     end
 end
