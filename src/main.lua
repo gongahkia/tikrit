@@ -33,6 +33,25 @@ local stats = {
 local visibilityMap = {} -- tracks which tiles have been seen
 local currentVisibleTiles = {} -- currently visible tiles
 
+-- Screen shake
+local screenShake = {
+    active = false,
+    duration = 0,
+    intensity = 0,
+    offsetX = 0,
+    offsetY = 0,
+}
+
+-- Particle systems
+local particleSystems = {
+    key = nil,
+    item = nil,
+    death = nil,
+    door = nil,
+}
+
+local activeParticles = {} -- Track active particle emitters
+
 local world = {
 
     player = {
@@ -716,6 +735,80 @@ function hasBeenVisited(x, y)
     return visibilityMap[key] ~= nil and currentVisibleTiles[key] == nil
 end
 
+-- Screen shake functions
+function startScreenShake(intensity, duration)
+    if CONFIG.SCREEN_SHAKE_ENABLED then
+        screenShake.active = true
+        screenShake.intensity = intensity or CONFIG.SHAKE_INTENSITY
+        screenShake.duration = duration or CONFIG.SHAKE_DURATION
+    end
+end
+
+function updateScreenShake(dt)
+    if screenShake.active then
+        screenShake.duration = screenShake.duration - dt
+        
+        if screenShake.duration <= 0 then
+            screenShake.active = false
+            screenShake.offsetX = 0
+            screenShake.offsetY = 0
+        else
+            -- Random shake offset
+            screenShake.offsetX = (math.random() * 2 - 1) * screenShake.intensity
+            screenShake.offsetY = (math.random() * 2 - 1) * screenShake.intensity
+        end
+    end
+end
+
+-- Particle system functions
+function createParticleImage()
+    -- Create a simple 2x2 white pixel image for particles
+    local imageData = love.image.newImageData(2, 2)
+    for x = 0, 1 do
+        for y = 0, 1 do
+            imageData:setPixel(x, y, 1, 1, 1, 1)
+        end
+    end
+    return love.graphics.newImage(imageData)
+end
+
+function spawnParticles(x, y, particleType)
+    if not CONFIG.PARTICLES_ENABLED then
+        return
+    end
+    
+    local ps = particleSystems[particleType]
+    if ps then
+        local emitter = {
+            system = ps:clone(),
+            x = x + CONFIG.TILE_SIZE / 2,
+            y = y + CONFIG.TILE_SIZE / 2,
+        }
+        emitter.system:emit(CONFIG["PARTICLE_COUNT_" .. string.upper(particleType)] or 15)
+        table.insert(activeParticles, emitter)
+    end
+end
+
+function updateParticles(dt)
+    for i = #activeParticles, 1, -1 do
+        local emitter = activeParticles[i]
+        emitter.system:update(dt)
+        
+        -- Remove dead particle systems
+        if emitter.system:getCount() == 0 then
+            table.remove(activeParticles, i)
+        end
+    end
+end
+
+function drawParticles()
+    if CONFIG.PARTICLES_ENABLED then
+        for _, emitter in ipairs(activeParticles) do
+            love.graphics.draw(emitter.system, emitter.x, emitter.y)
+        end
+    end
+end
+
 -- Ghost AI functions
 function initializeGhostAI()
     -- Assign AI types to ghosts based on their index
@@ -1059,6 +1152,46 @@ function love.load() -- load function that runs once at the beginning
     AmaticFont40 = love.graphics.newFont("font/Amatic-Bold.ttf", CONFIG.FONT_SIZE_MEDIUM)
     AmaticFont25 = love.graphics.newFont("font/Amatic-Bold.ttf", CONFIG.FONT_SIZE_SMALL)
 
+    -- ---------- PARTICLE SYSTEM LOADING ----------
+
+    local particleImage = createParticleImage()
+    
+    -- Key collection particles (gold sparkles)
+    particleSystems.key = love.graphics.newParticleSystem(particleImage, CONFIG.PARTICLE_COUNT_KEY)
+    particleSystems.key:setParticleLifetime(0.5, CONFIG.PARTICLE_LIFETIME)
+    particleSystems.key:setLinearAcceleration(-50, -50, 50, 50)
+    particleSystems.key:setColors(1, 1, 0, 1, 1, 1, 0, 0) -- Gold to transparent
+    particleSystems.key:setSizes(3, 1)
+    particleSystems.key:setSpeed(50, 100)
+    particleSystems.key:setSpread(math.pi * 2)
+    
+    -- Item pickup particles (blue/cyan sparkles)
+    particleSystems.item = love.graphics.newParticleSystem(particleImage, CONFIG.PARTICLE_COUNT_ITEM)
+    particleSystems.item:setParticleLifetime(0.3, 0.8)
+    particleSystems.item:setLinearAcceleration(-30, -30, 30, 30)
+    particleSystems.item:setColors(0, 1, 1, 1, 0, 0.5, 1, 0) -- Cyan to transparent
+    particleSystems.item:setSizes(2, 0.5)
+    particleSystems.item:setSpeed(40, 80)
+    particleSystems.item:setSpread(math.pi * 2)
+    
+    -- Death particles (red burst)
+    particleSystems.death = love.graphics.newParticleSystem(particleImage, CONFIG.PARTICLE_COUNT_DEATH)
+    particleSystems.death:setParticleLifetime(0.8, 1.5)
+    particleSystems.death:setLinearAcceleration(-20, -20, 20, 20)
+    particleSystems.death:setColors(1, 0, 0, 1, 0.5, 0, 0, 0) -- Red to dark transparent
+    particleSystems.death:setSizes(4, 1)
+    particleSystems.death:setSpeed(60, 120)
+    particleSystems.death:setSpread(math.pi * 2)
+    
+    -- Door open particles (dust cloud)
+    particleSystems.door = love.graphics.newParticleSystem(particleImage, CONFIG.PARTICLE_COUNT_DOOR)
+    particleSystems.door:setParticleLifetime(0.5, 1.0)
+    particleSystems.door:setLinearAcceleration(-10, -10, 10, 10)
+    particleSystems.door:setColors(0.6, 0.6, 0.6, 0.8, 0.4, 0.4, 0.4, 0) -- Gray to transparent
+    particleSystems.door:setSizes(2, 3)
+    particleSystems.door:setSpeed(20, 40)
+    particleSystems.door:setSpread(math.pi * 2)
+
     -- ---------- LOADING IN PRESETS -----------
 
     ambientNoiseSound:setLooping(true)
@@ -1196,6 +1329,10 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
         -- Update all active item effects
         updateItemEffects(dt)
+        
+        -- Update particles and screen shake
+        updateParticles(dt)
+        updateScreenShake(dt)
 
         if player.speed > CONFIG.PLAYER_SPEED then
             elapsedTime = elapsedTime + dt
@@ -1360,11 +1497,14 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                         player.coord[1], player.coord[2] = storedX, storedY
                         player.alive = false
                         stats.deaths = stats.deaths + 1
+                        spawnParticles(player.coord[1], player.coord[2], "death")
+                        startScreenShake(10, 0.5)
                         print("player died")
                         love.audio.play(playerDeathSound)
                     elseif activeEffects.invincibility then
                         -- Just bounce back but don't die
                         player.coord[1], player.coord[2] = storedX, storedY
+                        startScreenShake(3, 0.2) -- Lighter shake when invincible
                     end
                     -- love.event.quit()
                 end
@@ -1374,6 +1514,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             for i, itemCoord in ipairs(items.coord) do 
                 if checkCollision(itemCoord, player.coord) then
+                    spawnParticles(itemCoord[1], itemCoord[2], "item")
                     applyRandomItemEffect()
                     table.remove(items.coord, i)
                     stats.itemsUsed = stats.itemsUsed + 1
@@ -1385,7 +1526,8 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             for q, keyCoord in ipairs(keys.coord) do
                 if checkCollision(keyCoord, player.coord) then
-
+                    
+                    spawnParticles(keyCoord[1], keyCoord[2], "key")
                     table.remove(keys.coord, q)
                     player.keyCount = player.keyCount + 1
                     player.overallKeyCount = player.overallKeyCount + 1
@@ -1397,6 +1539,10 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                         print("all keys collected, opening doors")
                         love.audio.play(doorOpenSound)
                         doors.coord = {}
+                        -- Spawn door particles for all opened doors
+                        for _, doorCoord in ipairs(openedDoorSpriteCoords) do
+                            spawnParticles(doorCoord[1], doorCoord[2], "door")
+                        end
                     end
 
                 end
@@ -1488,6 +1634,12 @@ function love.draw() -- draw function that runs once every frame
         keys = world.key.coord
 
         love.graphics.clear()
+        
+        -- Apply screen shake
+        love.graphics.push()
+        if screenShake.active then
+            love.graphics.translate(screenShake.offsetX, screenShake.offsetY)
+        end
 
         -- SETS OVERLAYS AND SHADERS
 
@@ -1680,6 +1832,9 @@ function love.draw() -- draw function that runs once every frame
 
         love.graphics.setShader()
         
+        -- DRAW PARTICLES (under screen shake)
+        drawParticles()
+        
         -- DRAW HUD (always visible, not just debug mode)
         if not debugMode then
             love.graphics.setColor(0, 0, 0, 0.7)
@@ -1790,6 +1945,9 @@ function love.draw() -- draw function that runs once every frame
                 yPos = yPos + 25
             end
         end
+        
+        -- Pop screen shake transform
+        love.graphics.pop()
 
     elseif currentMode == "winScreen" then
         drawWinScreen()
