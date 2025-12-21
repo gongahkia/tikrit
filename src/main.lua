@@ -8,6 +8,7 @@ local Utils = require("modules/utils")
 local AI = require("modules/ai")
 local Effects = require("modules/effects")
 local UI = require("modules/ui")
+local Animation = require("modules/animation")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -1103,6 +1104,10 @@ function love.load() -- load function that runs once at the beginning
     -- Initialize ghost AI
     AI.initializeGhosts(world)
     
+    -- Initialize animations
+    Animation.init()
+    Animation.initGhostBobbing(#world.monster.coord)
+    
     -- Initialize statistics
     stats.startTime = love.timer.getTime()
     stats.roomsVisited = {[world.player.currRoom] = true}
@@ -1281,6 +1286,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             
             -- Reinitialize ghost AI for new room
             AI.initializeGhosts(world)
+            Animation.initGhostBobbing(#world.monster.coord)
 
             doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
             openedDoorSpriteCoords = shallowCopy(doorList)
@@ -1304,6 +1310,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         -- Update particles and screen shake
         Effects.updateParticles(dt)
         Effects.updateScreenShake(dt)
+        
+        -- Update animations
+        Animation.update(dt)
 
         if player.speed > CONFIG.PLAYER_SPEED then
             elapsedTime = elapsedTime + dt
@@ -1482,6 +1491,7 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 if checkCollision(keyCoord, player.coord) then
                     
                     Effects.spawn(keyCoord[1], keyCoord[2], "key")
+                    Animation.startChestOpening(keyCoord[1], keyCoord[2])
                     table.remove(keys.coord, q)
                     player.keyCount = player.keyCount + 1
                     player.overallKeyCount = player.overallKeyCount + 1
@@ -1493,9 +1503,10 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                         print("all keys collected, opening doors")
                         love.audio.play(doorOpenSound)
                         doors.coord = {}
-                        -- Spawn door particles for all opened doors
+                        -- Spawn door particles and animations for all opened doors
                         for _, doorCoord in ipairs(openedDoorSpriteCoords) do
                             Effects.spawn(doorCoord[1], doorCoord[2], "door")
+                            Animation.startDoorOpening(doorCoord[1], doorCoord[2])
                         end
                     end
 
@@ -1709,7 +1720,12 @@ function love.draw() -- draw function that runs once every frame
         -- love.graphics.setColor(1, 0.5, 0.5)
         for _, doorCoord in ipairs(doors) do
             if isVisible(doorCoord[1], doorCoord[2]) then
-                love.graphics.setColor(0.5, 0.5, 0.5, 1)
+                -- Check if door is animating (opening)
+                local alpha = 1.0
+                if CONFIG.ANIMATIONS_ENABLED and Animation.isDoorAnimating(doorCoord[1], doorCoord[2]) then
+                    alpha = Animation.getDoorAnimationAlpha(doorCoord[1], doorCoord[2])
+                end
+                love.graphics.setColor(0.5, 0.5, 0.5, alpha)
                 love.graphics.draw(closedDoorSprite, doorCoord[1], doorCoord[2])
             elseif hasBeenVisited(doorCoord[1], doorCoord[2]) then
                 love.graphics.setColor(0.5, 0.5, 0.5, CONFIG.VISITED_ALPHA)
@@ -1727,10 +1743,17 @@ function love.draw() -- draw function that runs once every frame
                 if isVisible(monsterCoord[1], monsterCoord[2]) then
                     love.graphics.setColor(0.5, 0.5, 0.5, 1)
                     local aiType = world.monster.aiTypes[i] or 1
+                    
+                    -- Apply bobbing animation
+                    local bobOffset = 0
+                    if CONFIG.ANIMATIONS_ENABLED then
+                        bobOffset = Animation.getGhostBobOffset(i, love.timer.getTime())
+                    end
+                    
                     if aiType == 1 then
-                        love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2]) -- Chase ghost
+                        love.graphics.draw(ghostSprite1, monsterCoord[1], monsterCoord[2] + bobOffset) -- Chase ghost with bob
                     else
-                        love.graphics.draw(ghostSprite2, monsterCoord[1], monsterCoord[2]) -- Patrol ghost
+                        love.graphics.draw(ghostSprite2, monsterCoord[1], monsterCoord[2] + bobOffset) -- Patrol ghost with bob
                     end
                 end
                 -- love.graphics.rectangle("fill", monsterCoord[1], monsterCoord[2], 20, 20)
@@ -1755,7 +1778,15 @@ function love.draw() -- draw function that runs once every frame
         for _, keyCoord in ipairs(keys) do
             if isVisible(keyCoord[1], keyCoord[2]) then
                 love.graphics.setColor(0.5, 0.5, 0.5, 1)
-                love.graphics.draw(closedChestSprite, keyCoord[1], keyCoord[2])
+                
+                -- Apply chest opening animation
+                if CONFIG.ANIMATIONS_ENABLED then
+                    local scale = Animation.getChestAnimationScale(keyCoord[1], keyCoord[2])
+                    local ox, oy = closedChestSprite:getWidth() / 2, closedChestSprite:getHeight() / 2
+                    love.graphics.draw(closedChestSprite, keyCoord[1] + ox, keyCoord[2] + oy, 0, scale, scale, ox, oy)
+                else
+                    love.graphics.draw(closedChestSprite, keyCoord[1], keyCoord[2])
+                end
             end
             -- love.graphics.rectangle("fill", keyCoord[1], keyCoord[2], 20, 20)
         end
@@ -1775,7 +1806,15 @@ function love.draw() -- draw function that runs once every frame
             else
                 love.graphics.setColor(0.5, 0.5, 0.5, 1)
             end
-            love.graphics.draw(playerSprite, playerCoord[1], playerCoord[2])
+            
+            -- Apply idle animation (subtle pulse)
+            if CONFIG.ANIMATIONS_ENABLED then
+                local scale = Animation.getPlayerIdleScale()
+                local ox, oy = playerSprite:getWidth() / 2, playerSprite:getHeight() / 2
+                love.graphics.draw(playerSprite, playerCoord[1] + ox, playerCoord[2] + oy, 0, scale, scale, ox, oy)
+            else
+                love.graphics.draw(playerSprite, playerCoord[1], playerCoord[2])
+            end
         else
             love.graphics.setColor(0.5, 0.5, 0.5, 1)
             love.graphics.draw(deadPlayerSprite, playerCoord[1], playerCoord[2])
