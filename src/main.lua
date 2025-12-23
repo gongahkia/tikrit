@@ -20,6 +20,7 @@ local pauseMenuSelection = 1 -- 1=resume, 2=restart, 3=quit
 local elapsedTime = 0
 local debugMode = false
 local godMode = false
+local minimapEnabled = CONFIG.MINIMAP_ENABLED
 
 -- Player last movement for attack direction
 local lastMoveX = 0
@@ -1537,6 +1538,17 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         else
             f5Pressed = false
         end
+        
+        -- minimap toggle (M)
+        if love.keyboard.isDown("m") then
+            if not mPressed then
+                minimapEnabled = not minimapEnabled
+                mPressed = true
+                print("Minimap:", minimapEnabled)
+            end
+        else
+            mPressed = false
+        end
 
         -- PLAYER MOVEMENT
 
@@ -2036,6 +2048,11 @@ function love.draw() -- draw function that runs once every frame
         
         -- DRAW HUD (always visible, not just debug mode)
         UI.drawHUD(world, Effects.activeEffects, debugMode, {small = AmaticFont25})
+        
+        -- DRAW MINIMAP
+        if minimapEnabled and not debugMode then
+            UI.drawMinimap(world, minimapEnabled)
+        end
         
         -- DRAW DEBUG OVERLAY
         if debugMode then

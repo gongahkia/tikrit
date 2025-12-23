@@ -3,7 +3,7 @@
 # Focus: Industry-relevant features, educational value, roguelike design patterns
 # Philosophy: Keep it simple, reuse existing assets, demonstrate best practices
 
-# IMPLEMENTATION STATUS: 15/34 recommendations completed as of 2024-12-22
+# IMPLEMENTATION STATUS: 16/34 recommendations completed as of 2024-12-23
 # See CHANGELOG.md for detailed implementation notes
 
 ================================================================================
@@ -14,6 +14,7 @@ COMPLETED FEATURES (✅)
 3. Dynamic Item Effects System (Recommendation #3)
 4. Score & Statistics Tracking System (Recommendation #4)
 5. Difficulty Selection System (Recommendation #5)
+7. Minimap Overlay System (Recommendation #7)
 8. Modular Code Refactoring (Recommendation #8)
 9. Configuration-Driven Design (Recommendation #9)
 10. Debug Visualization Mode (Recommendation #10)
@@ -151,8 +152,9 @@ SECTION A: GAMEPLAY ENHANCEMENTS (Reusing Existing Assets)
    Code Location: map/*.txt (level design), main.lua:206-238 (deserialize)
    Suggested Approach: Add new map symbols (^=spike, P=plate), implement in deserialize
 
-7. MINIMAP OVERLAY SYSTEM
+7. MINIMAP OVERLAY SYSTEM ✅ COMPLETED
    Priority: LOW | Difficulty: Medium | Asset Reuse: 70%
+   Status: Implemented minimap overlay with M toggle, shows player, ghosts, keys, items
 
    Implementation:
    - Small corner overlay showing current room layout

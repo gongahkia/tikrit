@@ -138,6 +138,98 @@ function UI.drawHUD(world, activeEffects, debugMode, fonts)
     end
 end
 
+-- Draw minimap overlay
+function UI.drawMinimap(world, minimapEnabled)
+    if not minimapEnabled then
+        return
+    end
+    
+    local scale = CONFIG.MINIMAP_SCALE
+    local offsetX = CONFIG.MINIMAP_POSITION_X
+    local offsetY = CONFIG.MINIMAP_POSITION_Y
+    local mapSize = CONFIG.MINIMAP_SIZE
+    
+    -- Draw background
+    love.graphics.setColor(0, 0, 0, CONFIG.MINIMAP_BACKGROUND_ALPHA)
+    love.graphics.rectangle("fill", offsetX, offsetY, mapSize, mapSize)
+    
+    -- Draw border
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.rectangle("line", offsetX, offsetY, mapSize, mapSize)
+    
+    -- Draw walls (gray)
+    love.graphics.setColor(0.4, 0.4, 0.4, 1)
+    for _, wallCoord in ipairs(world.wall.coord) do
+        local x = offsetX + (wallCoord[1] * scale)
+        local y = offsetY + (wallCoord[2] * scale)
+        local size = CONFIG.TILE_SIZE * scale
+        if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
+            love.graphics.rectangle("fill", x, y, math.max(1, size), math.max(1, size))
+        end
+    end
+    
+    -- Draw doors (yellow)
+    love.graphics.setColor(1, 1, 0, 0.7)
+    for _, doorCoord in ipairs(world.door.coord) do
+        local x = offsetX + (doorCoord[1] * scale)
+        local y = offsetY + (doorCoord[2] * scale)
+        local size = CONFIG.TILE_SIZE * scale
+        if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
+            love.graphics.rectangle("fill", x, y, math.max(2, size), math.max(2, size))
+        end
+    end
+    
+    -- Draw keys (gold)
+    if CONFIG.MINIMAP_SHOW_KEYS then
+        love.graphics.setColor(1, 0.84, 0, 1)
+        for _, keyCoord in ipairs(world.key.coord) do
+            local x = offsetX + (keyCoord[1] * scale) + (CONFIG.TILE_SIZE * scale / 2)
+            local y = offsetY + (keyCoord[2] * scale) + (CONFIG.TILE_SIZE * scale / 2)
+            if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
+                love.graphics.circle("fill", x, y, math.max(2, 3 * scale))
+            end
+        end
+    end
+    
+    -- Draw items (cyan)
+    if CONFIG.MINIMAP_SHOW_ITEMS then
+        love.graphics.setColor(0, 1, 1, 1)
+        for _, itemCoord in ipairs(world.item.coord) do
+            local x = offsetX + (itemCoord[1] * scale) + (CONFIG.TILE_SIZE * scale / 2)
+            local y = offsetY + (itemCoord[2] * scale) + (CONFIG.TILE_SIZE * scale / 2)
+            if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
+                love.graphics.circle("fill", x, y, math.max(2, 2 * scale))
+            end
+        end
+    end
+    
+    -- Draw ghosts (red)
+    if CONFIG.MINIMAP_SHOW_GHOSTS and world.player.alive then
+        love.graphics.setColor(1, 0, 0, 0.8)
+        for _, monsterCoord in ipairs(world.monster.coord) do
+            local x = offsetX + (monsterCoord[1] * scale) + (CONFIG.TILE_SIZE * scale / 2)
+            local y = offsetY + (monsterCoord[2] * scale) + (CONFIG.TILE_SIZE * scale / 2)
+            if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
+                love.graphics.circle("fill", x, y, math.max(2, 3 * scale))
+            end
+        end
+    end
+    
+    -- Draw player (green)
+    if world.player.alive then
+        love.graphics.setColor(0, 1, 0, 1)
+        local x = offsetX + (world.player.coord[1] * scale) + (CONFIG.TILE_SIZE * scale / 2)
+        local y = offsetY + (world.player.coord[2] * scale) + (CONFIG.TILE_SIZE * scale / 2)
+        if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
+            love.graphics.circle("fill", x, y, math.max(3, 4 * scale))
+        end
+    end
+    
+    -- Draw label
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("MAP (M)", offsetX + 5, offsetY + mapSize + 5)
+end
+
 -- Calculate grade based on performance
 function UI.calculateGrade(deaths, elapsedTime)
     if deaths == 0 and elapsedTime < 120 then 

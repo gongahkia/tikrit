@@ -143,4 +143,16 @@ CONFIG.PROCGEN_MAX_ROOM_SIZE = 15
 CONFIG.PROCGEN_CAVE_FILL_PERCENT = 45  -- for cellular automata
 CONFIG.PROCGEN_CAVE_SMOOTH_ITERATIONS = 5
 
+-- Minimap settings
+CONFIG.MINIMAP_ENABLED = true
+CONFIG.MINIMAP_TOGGLE_KEY = "m"  -- Toggle minimap with M key
+CONFIG.MINIMAP_SIZE = 150  -- Size of minimap in pixels
+CONFIG.MINIMAP_POSITION_X = 10  -- X position (from left)
+CONFIG.MINIMAP_POSITION_Y = 120  -- Y position (from top, below HUD)
+CONFIG.MINIMAP_SCALE = 0.25  -- Scale factor for minimap
+CONFIG.MINIMAP_BACKGROUND_ALPHA = 0.7  -- Background transparency
+CONFIG.MINIMAP_SHOW_GHOSTS = true  -- Show ghosts on minimap
+CONFIG.MINIMAP_SHOW_ITEMS = true  -- Show items on minimap
+CONFIG.MINIMAP_SHOW_KEYS = true  -- Show keys on minimap
+
 return CONFIG

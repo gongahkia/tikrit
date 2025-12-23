@@ -23,6 +23,7 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 - **Debug Mode**: F3 (shows FPS, collision boxes, AI vectors, stats)
 - **God Mode**: F4 (disable collision for testing)
 - **Fog of War Toggle**: F5 (enable/disable during gameplay)
+- **Minimap Toggle**: M (show/hide minimap overlay)
 - **Menu Navigation**: Up/Down arrows
 - **Menu Selection**: Enter
 
@@ -30,6 +31,7 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 - Key collection progress
 - Current room number  
 - Active effect indicators (Invincible, Ghosts Slowed, Map Revealed)
+- Minimap overlay (toggle with M) showing current room layout, player position, ghosts, keys, and items
 
 ### Developer Features
 - Configuration-driven design via `config.lua`
