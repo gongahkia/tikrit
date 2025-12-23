@@ -11,6 +11,7 @@ local UI = require("modules/ui")
 local Animation = require("modules/animation")
 local Audio = require("modules/audio")
 local Combat = require("modules/combat")
+local ProcGen = require("modules/procgen")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -36,6 +37,7 @@ local activeEffects = {
 
 local stats = {
     startTime = 0,
+    finishTime = 0,
     roomsVisited = {},
     keysCollected = 0,
     deaths = 0,
@@ -155,6 +157,89 @@ function shallowCopy(og)
         fin[key] = value
     end
     return fin
+end
+
+-- ---------- PROCEDURAL GENERATION ----------
+
+function generateProceduralMap()
+    -- Use procedural generation to create map layout
+    local mapWidth = math.floor(CONFIG.MAP_WIDTH / CONFIG.TILE_SIZE)
+    local mapHeight = math.floor(CONFIG.MAP_HEIGHT / CONFIG.TILE_SIZE)
+    
+    local grid, rooms
+    if CONFIG.PROCGEN_ALGORITHM == "cave" then
+        grid = ProcGen.generateCaveLayout(
+            mapWidth, 
+            mapHeight, 
+            CONFIG.PROCGEN_CAVE_FILL_PERCENT, 
+            CONFIG.PROCGEN_CAVE_SMOOTH_ITERATIONS
+        )
+    else -- BSP by default
+        grid, rooms = ProcGen.generateRoomLayout(
+            mapWidth, 
+            mapHeight, 
+            CONFIG.PROCGEN_MIN_ROOM_SIZE, 
+            CONFIG.PROCGEN_MAX_ROOM_SIZE
+        )
+    end
+    
+    -- Clear existing world data
+    world.wall.coord = {}
+    world.door.coord = {}
+    world.monster.coord = {}
+    world.item.coord = {}
+    world.key.coord = {}
+    
+    -- Convert grid to world coordinates
+    for y = 1, #grid do
+        for x = 1, #grid[y] do
+            local worldX = (x - 1) * CONFIG.TILE_SIZE
+            local worldY = (y - 1) * CONFIG.TILE_SIZE
+            
+            if grid[y][x] == 1 then
+                -- Wall
+                table.insert(world.wall.coord, {worldX, worldY})
+            end
+        end
+    end
+    
+    -- Determine entity counts based on difficulty
+    local difficulty = CONFIG.DIFFICULTY_SETTINGS[CONFIG.DIFFICULTY]
+    local entityCounts = {
+        monsters = math.random(CONFIG.MIN_ROOMS * 2, CONFIG.MAX_ROOMS * 2),
+        keys = math.random(CONFIG.MIN_ROOMS, CONFIG.MAX_ROOMS),
+        items = math.floor(math.random(CONFIG.MIN_ROOMS, CONFIG.MAX_ROOMS) * difficulty.itemSpawnMultiplier)
+    }
+    
+    -- Place entities using procedural generation
+    local entities = ProcGen.placeEntities(grid, entityCounts)
+    
+    -- Set player start position
+    if entities.playerStart then
+        world.player.coord[1] = entities.playerStart[1]
+        world.player.coord[2] = entities.playerStart[2]
+    end
+    
+    -- Place monsters
+    for _, pos in ipairs(entities.monsters) do
+        table.insert(world.monster.coord, {pos[1], pos[2]})
+    end
+    
+    -- Place keys
+    for _, pos in ipairs(entities.keys) do
+        table.insert(world.key.coord, {pos[1], pos[2]})
+    end
+    world.key.globalCount = #entities.keys
+    
+    -- Place items
+    for _, pos in ipairs(entities.items) do
+        table.insert(world.item.coord, {pos[1], pos[2]})
+    end
+    
+    -- Initialize visibility for fog of war
+    if CONFIG.FOG_ENABLED then
+        Utils.initVisibility(CONFIG.MAP_WIDTH, CONFIG.MAP_HEIGHT, CONFIG.TILE_SIZE)
+    end
 end
 
 -- ---------- UTILITY ----------
@@ -1093,19 +1178,32 @@ function love.load() -- load function that runs once at the beginning
 
     love.window.setTitle(CONFIG.WINDOW_TITLE)
     love.window.setMode(CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT)
-    randomiseMap("map/layout.txt")
-    worldMap = generateMap("map/layout.txt")
-    world.key.globalCount = totalKeys(worldMap)
-    playerRoomCoord = validStartingRoomAndCoord(worldMap)
-    randomFloorMap = randomFloor(worldMap)
-    randomWallMap = randomWall(worldMap)
-    world.player.currRoom = playerRoomCoord[1]
-    world.player.coord = playerRoomCoord[2]
-    deserialize(string.format("map/%s.txt", playerRoomCoord[1]))
-    doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
-    openedDoorSpriteCoords = shallowCopy(doorList)
-    addDoorAsWall(world,doorList)
-    world.door.coord = doorList
+    
+    -- Use procedural generation if enabled, otherwise use room-based system
+    if CONFIG.PROCGEN_ENABLED then
+        generateProceduralMap()
+        worldMap = {}  -- Empty world map for procgen
+        world.player.currRoom = "procgen"
+        -- Initialize empty floor/wall maps for compatibility
+        randomFloorMap = {}
+        randomWallMap = {}
+        doorList = {}
+        openedDoorSpriteCoords = {}
+    else
+        randomiseMap("map/layout.txt")
+        worldMap = generateMap("map/layout.txt")
+        world.key.globalCount = totalKeys(worldMap)
+        playerRoomCoord = validStartingRoomAndCoord(worldMap)
+        randomFloorMap = randomFloor(worldMap)
+        randomWallMap = randomWall(worldMap)
+        world.player.currRoom = playerRoomCoord[1]
+        world.player.coord = playerRoomCoord[2]
+        deserialize(string.format("map/%s.txt", playerRoomCoord[1]))
+        doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
+        openedDoorSpriteCoords = shallowCopy(doorList)
+        addDoorAsWall(world,doorList)
+        world.door.coord = doorList
+    end
     
     -- Initialize ghost AI
     AI.initializeGhosts(world)
@@ -1252,6 +1350,10 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             love.audio.stop(playerWalkingSound)
             love.audio.stop(ambientNoiseSound)
             love.audio.stop(ghostScreamSound)
+            -- Store finish time
+            if stats.finishTime == 0 then
+                stats.finishTime = love.timer.getTime()
+            end
             -- love.event.quit()
             currentMode = "loseScreen"
         end
@@ -1265,6 +1367,10 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             love.audio.stop(playerWalkingSound)
             love.audio.stop(ambientNoiseSound)
             love.audio.stop(ghostScreamSound)
+            -- Store finish time
+            if stats.finishTime == 0 then
+                stats.finishTime = love.timer.getTime()
+            end
             -- love.event.quit()
             currentMode = "winScreen"
         end 

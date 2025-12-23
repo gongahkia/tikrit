@@ -41,7 +41,7 @@ function UI.drawLoseScreen(world, stats, fonts)
     local text3 = "Made by @gongahkia on Github in Love2D"
     local roomCount = 0
     for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
-    local elapsedGameTime = math.floor(love.timer.getTime() - stats.startTime)
+    local elapsedGameTime = math.floor((stats.finishTime > 0 and stats.finishTime or love.timer.getTime()) - stats.startTime)
     
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.setFont(fonts.large)
@@ -64,7 +64,7 @@ function UI.drawWinScreen(world, stats, fonts)
     local text3 = "Made by @gongahkia on Github in Love2D"
     local roomCount = 0
     for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
-    local elapsedGameTime = math.floor(love.timer.getTime() - stats.startTime)
+    local elapsedGameTime = math.floor((stats.finishTime > 0 and stats.finishTime or love.timer.getTime()) - stats.startTime)
     
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.setFont(fonts.large)
