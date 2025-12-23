@@ -65,5 +65,15 @@ release: love-file macos
 clean-dist:
 	rm -rf dist/
 
-.PHONY: all build reset debug clean dist love-file macos windows linux release clean-dist
+# Run automated tests
+test:
+	@echo "Running Tikrit test suite..."
+	@lua test/run_tests.lua
+
+# Run tests with verbose output
+test-verbose:
+	@echo "Running Tikrit test suite (verbose)..."
+	@lua test/run_tests.lua -v
+
+.PHONY: all build reset debug clean dist love-file macos windows linux release clean-dist test test-verbose
 

@@ -49,6 +49,7 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 
 ### Developer Features
 - **Comprehensive Documentation**: Professional documentation suite (ARCHITECTURE.md, LEVEL_DESIGN.md, MODDING.md, API.md)
+- **Automated Testing Framework**: Lightweight testing with 40%+ coverage (Utils, AI, Map Validation) - run with `make test`
 - **Configuration-driven Design**: All game parameters in `config.lua`
 - **Event System**: Observer pattern for decoupled communication
 - **State Machine**: Professional state management framework
@@ -66,6 +67,24 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 - **[API.md](API.md)** - Comprehensive function reference for all 14 modules
 - **[DISTRIBUTION.md](DISTRIBUTION.md)** - Build instructions for all platforms
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and detailed feature documentation
+- **[test/README.md](test/README.md)** - Testing framework guide, writing tests, CI/CD integration
+
+## Testing
+
+```bash
+# Run automated test suite
+make test
+
+# Or run directly
+lua test/run_tests.lua
+```
+
+The testing framework includes:
+- **Utils Module Tests**: Distance, clamping, coordinate conversion, walkability
+- **AI Module Tests**: A* pathfinding, line-of-sight, state transitions
+- **Map Validation Tests**: Structure verification, required elements, borders
+
+See [test/README.md](test/README.md) for details on writing and running tests.
 
 ## Installation
 
