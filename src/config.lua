@@ -180,4 +180,15 @@ CONFIG.SLOW_MODE_MULTIPLIER = 0.5
 CONFIG.VISUAL_AUDIO_INDICATORS = true  -- Show visual indicators for sound cues
 CONFIG.FONT_SIZE_MULTIPLIER = 1.0  -- Adjust font sizes (0.8 to 1.5)
 
+-- Room Hazards
+CONFIG.HAZARDS_ENABLED = true
+CONFIG.SPIKE_DAMAGE = 20  -- Damage from spike traps
+CONFIG.SPIKE_COOLDOWN = 1.0  -- Time between spike activations (seconds)
+CONFIG.SPIKE_ACTIVE_TIME = 1.0  -- How long spikes stay active
+CONFIG.SPIKE_INACTIVE_TIME = 2.0  -- How long spikes stay inactive
+CONFIG.PRESSURE_PLATE_RADIUS = 10  -- Activation distance
+CONFIG.TIMED_ROOM_DURATION = 30  -- Time limit for timed rooms (seconds)
+CONFIG.TIMED_ROOM_WARNING_TIME = 10  -- When to start warning (seconds remaining)
+CONFIG.DARK_ZONE_VISION_MULTIPLIER = 0.5  -- Vision radius multiplier in dark zones
+
 return CONFIG

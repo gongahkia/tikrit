@@ -13,6 +13,7 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 - **Four Difficulty Levels**: Easy, Normal, Hard, and Nightmare modes
 - **Daily Challenge Mode**: Fixed seed based on current date - everyone plays the same map each day (toggle with D on title screen)
 - **Inventory System**: Hold up to 3 items and use them strategically with number keys (1-3)
+- **Room Hazards**: Spike traps, pressure plates, timed rooms, and dark zones add environmental dangers
 - **Fog of War System**: Limited vision radius with memory of previously visited areas
 - **Smart Ghost AI**: Two distinct AI behaviors (aggressive chase and territorial patrol)
 - **Dynamic Item Effects**: Random effects from potions (speed boost, invincibility, ghost slow, map reveal, etc.)

@@ -13,6 +13,7 @@ local Audio = require("modules/audio")
 local Combat = require("modules/combat")
 local ProcGen = require("modules/procgen")
 local Accessibility = require("modules/accessibility")
+local Hazards = require("modules/hazards")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -551,6 +552,12 @@ function deserialize(fileName)
                     table.insert(world.monster.coord, {x * 20, y * 20})
                 elseif char == "@" then
                     world.player.coord = {x * 20, y * 20}
+                elseif char == "^" then
+                    Hazards.addSpike(x * 20, y * 20)
+                elseif char == "P" then
+                    Hazards.addPressurePlate(x * 20, y * 20)
+                elseif char == "T" then
+                    Hazards.activateTimedRoom()
                 end
                 x = x + 1
             end 
@@ -580,6 +587,7 @@ function reset(tbl)
     tbl.key.coord = {}
     tbl.key.totalCount = 0
     tbl.door.coord = {}
+    Hazards.init()  -- Reset hazards when changing rooms
     return tbl
 end
 
@@ -1631,6 +1639,27 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         -- Update combat
         Combat.update(dt)
         
+        -- Update hazards and apply damage
+        local hazardDamage = Hazards.update(dt, player.coord)
+        
+        if hazardDamage > 0 and not godMode and not Effects.activeEffects.invincibility then
+            -- Player took damage from hazard
+            player.alive = false
+            stats.deaths = stats.deaths + 1
+            Effects.spawn(player.coord[1], player.coord[2], "death")
+            Effects.startScreenShake(10, 0.5)
+            print("player died from hazard")
+            love.audio.play(playerDeathSound)
+        elseif hazardDamage < 0 then
+            -- Timed room failed
+            player.alive = false
+            stats.deaths = stats.deaths + 1
+            Effects.spawn(player.coord[1], player.coord[2], "death")
+            Effects.startScreenShake(15, 0.7)
+            print("player died - time ran out!")
+            love.audio.play(playerDeathSound)
+        end
+        
         -- Update ambient music volume based on game state
         if CONFIG.POSITIONAL_AUDIO_ENABLED then
             local closestGhostDist = math.huge
@@ -2297,6 +2326,9 @@ function love.draw() -- draw function that runs once every frame
             end
             -- love.graphics.rectangle("fill", keyCoord[1], keyCoord[2], 20, 20)
         end
+        
+        -- DRAW HAZARDS (spikes, pressure plates, etc.)
+        Hazards.draw(wallSprite1)
 
         -- DRAW PLAYER CHARACTER
 
@@ -2337,6 +2369,9 @@ function love.draw() -- draw function that runs once every frame
         
         -- DRAW HUD (always visible, not just debug mode)
         UI.drawHUD(world, Effects.activeEffects, debugMode, {small = AmaticFont25})
+        
+        -- DRAW TIMED ROOM UI
+        Hazards.drawTimedRoomUI()
         
         -- DRAW MINIMAP
         if minimapEnabled and not debugMode then
