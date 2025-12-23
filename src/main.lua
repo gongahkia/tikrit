@@ -1669,6 +1669,12 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             
             if settings.fogEnabled then
                 CONFIG.FOG_ENABLED = true
+            else
+                CONFIG.FOG_ENABLED = false
+            end
+            
+            if settings.visionRadius then
+                CONFIG.VISION_RADIUS = settings.visionRadius
             end
             
             -- Set game seed for daily challenge or random

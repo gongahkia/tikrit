@@ -45,19 +45,22 @@ CONFIG.DIFFICULTY_SETTINGS = {
         monsterSpeed = 35,
         playerSpeed = 250,
         itemSpawnMultiplier = 1.5,
-        requiredKeyPercentage = 0.6
+        requiredKeyPercentage = 0.6,
+        visionRadius = 7
     },
     normal = {
         monsterSpeed = 50,
         playerSpeed = 200,
         itemSpawnMultiplier = 1.0,
-        requiredKeyPercentage = 1.0
+        requiredKeyPercentage = 1.0,
+        visionRadius = 7
     },
     hard = {
         monsterSpeed = 70,
         playerSpeed = 180,
         itemSpawnMultiplier = 0.7,
-        requiredKeyPercentage = 1.0
+        requiredKeyPercentage = 1.0,
+        visionRadius = 6
     },
     nightmare = {
         monsterSpeed = 90,
@@ -65,7 +68,8 @@ CONFIG.DIFFICULTY_SETTINGS = {
         itemSpawnMultiplier = 0.4,
         requiredKeyPercentage = 1.0,
         fogEnabled = true,
-        permadeath = true
+        permadeath = true,
+        visionRadius = 4
     }
 }
 
