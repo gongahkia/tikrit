@@ -48,12 +48,24 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 - Minimap overlay (toggle with M) showing current room layout, player position, ghosts, keys, and items
 
 ### Developer Features
-- Configuration-driven design via `config.lua`
-- Debug visualization mode for development (F3)
-- Performance profiler with frame timing and memory tracking (F6)
-- Accessibility features: colorblind modes (F7), high contrast (F8), slow mode (F9), visual audio indicators
-- Comprehensive statistics tracking
-- Modular AI system for easy expansion
+- **Comprehensive Documentation**: Professional documentation suite (ARCHITECTURE.md, LEVEL_DESIGN.md, MODDING.md, API.md)
+- **Configuration-driven Design**: All game parameters in `config.lua`
+- **Event System**: Observer pattern for decoupled communication
+- **State Machine**: Professional state management framework
+- **Modular Architecture**: 14 separate modules with clear responsibilities
+- **Debug Visualization**: Collision boxes, AI vectors, performance stats (F3)
+- **Performance Profiler**: Frame timing, memory tracking, FPS graph (F6)
+- **Accessibility Features**: Colorblind modes (F7), high contrast (F8), slow mode (F9), visual audio indicators
+- **Build Pipeline**: Automated cross-platform distribution (makefile, build.sh)
+
+## Documentation
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Complete system design, module descriptions, data flow diagrams
+- **[LEVEL_DESIGN.md](LEVEL_DESIGN.md)** - Map creation guide, design principles, room archetypes, balancing
+- **[MODDING.md](MODDING.md)** - Extension guide, custom entities, event system, boss fight example
+- **[API.md](API.md)** - Comprehensive function reference for all 14 modules
+- **[DISTRIBUTION.md](DISTRIBUTION.md)** - Build instructions for all platforms
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and detailed feature documentation
 
 ## Installation
 
