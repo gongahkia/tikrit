@@ -60,7 +60,7 @@ function ProcGen.generateRoomLayout(width, height, minRoomSize, maxRoomSize)
     
     split(1, 1, width, height, 0)
     
-    -- Connect rooms with corridors
+    -- Connect rooms with corridors (2 tiles wide)
     for i = 1, #rooms - 1 do
         local room1 = rooms[i]
         local room2 = rooms[i + 1]
@@ -70,17 +70,25 @@ function ProcGen.generateRoomLayout(width, height, minRoomSize, maxRoomSize)
         local centerX2 = room2.x + math.floor(room2.w / 2)
         local centerY2 = room2.y + math.floor(room2.h / 2)
         
-        -- Create L-shaped corridor
+        -- Create L-shaped corridor (2 tiles wide)
         if math.random() > 0.5 then
             -- Horizontal then vertical
             for x = math.min(centerX1, centerX2), math.max(centerX1, centerX2) do
                 if x > 0 and x <= width and centerY1 > 0 and centerY1 <= height then
                     grid[centerY1][x] = 0
+                    -- Make corridor 2 tiles wide
+                    if centerY1 + 1 <= height then
+                        grid[centerY1 + 1][x] = 0
+                    end
                 end
             end
             for y = math.min(centerY1, centerY2), math.max(centerY1, centerY2) do
                 if centerX2 > 0 and centerX2 <= width and y > 0 and y <= height then
                     grid[y][centerX2] = 0
+                    -- Make corridor 2 tiles wide
+                    if centerX2 + 1 <= width then
+                        grid[y][centerX2 + 1] = 0
+                    end
                 end
             end
         else
@@ -88,11 +96,19 @@ function ProcGen.generateRoomLayout(width, height, minRoomSize, maxRoomSize)
             for y = math.min(centerY1, centerY2), math.max(centerY1, centerY2) do
                 if centerX1 > 0 and centerX1 <= width and y > 0 and y <= height then
                     grid[y][centerX1] = 0
+                    -- Make corridor 2 tiles wide
+                    if centerX1 + 1 <= width then
+                        grid[y][centerX1 + 1] = 0
+                    end
                 end
             end
             for x = math.min(centerX1, centerX2), math.max(centerX1, centerX2) do
                 if x > 0 and x <= width and centerY2 > 0 and centerY2 <= height then
                     grid[centerY2][x] = 0
+                    -- Make corridor 2 tiles wide
+                    if centerY2 + 1 <= height then
+                        grid[centerY2 + 1][x] = 0
+                    end
                 end
             end
         end
