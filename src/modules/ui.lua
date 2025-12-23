@@ -4,7 +4,7 @@ local CONFIG = require("config")
 local UI = {}
 
 -- Draw functions for various screens
-function UI.drawTitleScreen(difficultyMenuSelection, fonts)
+function UI.drawTitleScreen(difficultyMenuSelection, fonts, dailyChallengeEnabled)
     local text1 = "TIKRIT"
     local text2 = "Select Difficulty"
     local text3 = "Made by @gongahkia on Github in Love2D"
@@ -29,9 +29,18 @@ function UI.drawTitleScreen(difficultyMenuSelection, fonts)
         end
     end
     
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    -- Daily challenge indicator
     love.graphics.setFont(fonts.small)
-    love.graphics.print("Use UP/DOWN arrows to select, ENTER to start", (love.graphics.getWidth() - fonts.small:getWidth("Use UP/DOWN arrows to select, ENTER to start"))/2, 500)
+    if dailyChallengeEnabled then
+        love.graphics.setColor(1, 0.84, 0, 1)  -- Gold for daily challenge
+        local Utils = require("modules/utils")
+        local dailyText = "DAILY CHALLENGE: " .. Utils.getDailyDateString()
+        love.graphics.print(dailyText, (love.graphics.getWidth() - fonts.small:getWidth(dailyText))/2, 420)
+    end
+    
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.print("Use UP/DOWN arrows to select, ENTER to start", (love.graphics.getWidth() - fonts.small:getWidth("Use UP/DOWN arrows to select, ENTER to start"))/2, 460)
+    love.graphics.print("Press D to toggle Daily Challenge mode", (love.graphics.getWidth() - fonts.small:getWidth("Press D to toggle Daily Challenge mode"))/2, 485)
     love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
 end
 
@@ -59,7 +68,7 @@ function UI.drawLoseScreen(world, stats, fonts)
     love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
 end
 
-function UI.drawWinScreen(world, stats, fonts)
+function UI.drawWinScreen(world, stats, fonts, dailyChallengeEnabled)
     local text1 = "You Win!"
     local text3 = "Made by @gongahkia on Github in Love2D"
     local roomCount = 0
@@ -77,6 +86,14 @@ function UI.drawWinScreen(world, stats, fonts)
     local statsText = string.format("Time: %d seconds | Rooms: %d | Items: %d | Deaths: %d", elapsedGameTime, roomCount, stats.itemsUsed, stats.deaths)
     love.graphics.print(statsText, (love.graphics.getWidth() - fonts.small:getWidth(statsText))/2, 260)
     love.graphics.print("Difficulty: " .. CONFIG.DIFFICULTY, (love.graphics.getWidth() - fonts.small:getWidth("Difficulty: " .. CONFIG.DIFFICULTY))/2, 290)
+    
+    -- Daily challenge indicator
+    if dailyChallengeEnabled then
+        love.graphics.setColor(1, 0.84, 0, 1)
+        local Utils = require("modules/utils")
+        local dailyText = "Daily Challenge: " .. Utils.getDailyDateString()
+        love.graphics.print(dailyText, (love.graphics.getWidth() - fonts.small:getWidth(dailyText))/2, 315)
+    end
     
     -- Grade system
     local grade = UI.calculateGrade(stats.deaths, elapsedGameTime)

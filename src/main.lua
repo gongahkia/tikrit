@@ -21,6 +21,8 @@ local elapsedTime = 0
 local debugMode = false
 local godMode = false
 local minimapEnabled = CONFIG.MINIMAP_ENABLED
+local dailyChallengeEnabled = CONFIG.DAILY_CHALLENGE_ENABLED
+local currentSeed = nil  -- Track the seed being used
 
 -- Player last movement for attack direction
 local lastMoveX = 0
@@ -249,7 +251,7 @@ function randomiseMap(fileName) -- generates map layouts which are applied on la
 
     while true do
 
-        math.randomseed(os.time())
+        -- Use current seed (already set by Utils.setGameSeed)
         local fhand = io.open(fileName, "w")
         local fin = ""
         local tem = {}
@@ -588,7 +590,7 @@ function totalKeys()
 end
 
 function startingRoom(worldMap)
-    math.randomseed(os.time())
+    -- Don't reseed here - use existing seed
     local tem = {}
     for _,el in ipairs(worldMap) do
         table.insert(tem,el)
@@ -597,7 +599,7 @@ function startingRoom(worldMap)
 end
 
 function startingCoord(roomNumber, map)
-    math.randomseed(os.time())
+    -- Don't reseed here - use existing seed
     genX = math.random(2,28)
     genY = math.random(2,28)
 
@@ -636,7 +638,7 @@ function validStartingRoomAndCoord(worldMap)
 end
 
 function randomFloor(worldMap)
-    math.randomseed(os.time())
+    -- Don't reseed here - use existing seed
     fin = {}
     for _, el in ipairs(worldMap) do
         tem = {}
@@ -656,7 +658,7 @@ function randomFloor(worldMap)
 end
 
 function randomWall(worldMap)
-    math.randomseed(os.time())
+    -- Don't reseed here - use existing seed
     fin = {}
     for _, el in ipairs(worldMap) do
         tem = {}
@@ -703,7 +705,7 @@ end
 
 function sanitiseMonsterCoord(earth)
 
-    math.randomseed(os.time())
+    -- Don't reseed here - use existing seed
 
     fin = {}
 
@@ -1286,8 +1288,6 @@ end
 
 function love.update(dt) -- update function that runs once every frame; dt is change in time and can be used for different tasks
 
-    math.randomseed(os.time())
-
     if currentMode == "titleScreen" then
         
         -- Handle difficulty selection
@@ -1308,6 +1308,17 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         else
             downPressed = false
         end
+        
+        -- Toggle daily challenge mode
+        if love.keyboard.isDown("d") then
+            if not dPressed then
+                dailyChallengeEnabled = not dailyChallengeEnabled
+                dPressed = true
+                print("Daily Challenge Mode:", dailyChallengeEnabled)
+            end
+        else
+            dPressed = false
+        end
 
         if love.keyboard.isDown("return") then
             -- Apply difficulty settings
@@ -1325,7 +1336,15 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 CONFIG.FOG_ENABLED = true
             end
             
+            -- Set game seed for daily challenge or random
+            currentSeed = Utils.setGameSeed(dailyChallengeEnabled, CONFIG.USE_CUSTOM_SEED and CONFIG.CUSTOM_SEED or nil)
             print("Starting game with difficulty: " .. selectedDifficulty)
+            if dailyChallengeEnabled then
+                print("Daily Challenge Mode - Seed: " .. currentSeed .. " (" .. Utils.getDailyDateString() .. ")")
+            else
+                print("Random seed: " .. currentSeed)
+            end
+            
             currentMode = "gameScreen"
         elseif love.keyboard.isDown("escape") then
             love.event.quit()
@@ -1806,7 +1825,7 @@ function love.draw() -- draw function that runs once every frame
     math.randomseed(os.time())
 
     if currentMode == "titleScreen" then
-        UI.drawTitleScreen(difficultyMenuSelection, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25})
+        UI.drawTitleScreen(difficultyMenuSelection, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25}, dailyChallengeEnabled)
     elseif currentMode == "gameScreen" then -- draw game
 
         playerCoord = world.player.coord
@@ -2146,7 +2165,7 @@ function love.draw() -- draw function that runs once every frame
         love.graphics.pop()
 
     elseif currentMode == "winScreen" then
-        UI.drawWinScreen(world, stats, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25})
+        UI.drawWinScreen(world, stats, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25}, dailyChallengeEnabled)
     elseif currentMode == "loseScreen" then
         UI.drawLoseScreen(world, stats, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25})
     elseif currentMode == "pauseScreen" then

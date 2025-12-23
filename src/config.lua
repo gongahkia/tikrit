@@ -155,4 +155,10 @@ CONFIG.MINIMAP_SHOW_GHOSTS = true  -- Show ghosts on minimap
 CONFIG.MINIMAP_SHOW_ITEMS = true  -- Show items on minimap
 CONFIG.MINIMAP_SHOW_KEYS = true  -- Show keys on minimap
 
+-- Daily Challenge Mode
+CONFIG.DAILY_CHALLENGE_ENABLED = false  -- Toggle daily challenge mode
+CONFIG.DAILY_CHALLENGE_SEED = nil  -- Will be set based on date
+CONFIG.USE_CUSTOM_SEED = false  -- For testing/replays
+CONFIG.CUSTOM_SEED = 12345  -- Custom seed value
+
 return CONFIG

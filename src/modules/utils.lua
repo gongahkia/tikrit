@@ -56,4 +56,31 @@ function Utils.distance(x1, y1, x2, y2)
     return math.sqrt((x2 - x1)^2 + (y2 - y1)^2)
 end
 
+-- Get daily challenge seed based on current date
+function Utils.getDailySeed()
+    local date = os.date("*t")
+    -- Create seed from year, month, day
+    local seed = date.year * 10000 + date.month * 100 + date.day
+    return seed
+end
+
+-- Get formatted date string for display
+function Utils.getDailyDateString()
+    return os.date("%Y-%m-%d")
+end
+
+-- Set random seed based on daily challenge or time
+function Utils.setGameSeed(useDailyChallenge, customSeed)
+    local seed
+    if customSeed then
+        seed = customSeed
+    elseif useDailyChallenge then
+        seed = Utils.getDailySeed()
+    else
+        seed = os.time()
+    end
+    math.randomseed(seed)
+    return seed
+end
+
 return Utils

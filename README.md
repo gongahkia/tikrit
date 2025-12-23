@@ -11,6 +11,7 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 
 ### Gameplay
 - **Four Difficulty Levels**: Easy, Normal, Hard, and Nightmare modes
+- **Daily Challenge Mode**: Fixed seed based on current date - everyone plays the same map each day (toggle with D on title screen)
 - **Fog of War System**: Limited vision radius with memory of previously visited areas
 - **Smart Ghost AI**: Two distinct AI behaviors (aggressive chase and territorial patrol)
 - **Dynamic Item Effects**: Random effects from potions (speed boost, invincibility, ghost slow, map reveal, etc.)
@@ -19,7 +20,8 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 
 ### Controls
 - **Movement**: WASD or Arrow Keys
-- **Pause**: P or ESC
+- **Paily Challenge Toggle**: D (on title screen)
+- **Dause**: P or ESC
 - **Debug Mode**: F3 (shows FPS, collision boxes, AI vectors, stats)
 - **God Mode**: F4 (disable collision for testing)
 - **Fog of War Toggle**: F5 (enable/disable during gameplay)
