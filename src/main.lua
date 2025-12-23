@@ -18,6 +18,7 @@ local Events = require("modules/events")
 local Progression = require("modules/progression")
 local Editor = require("modules/editor")
 local Replay = require("modules/replay")
+local Stealth = require("modules/stealth")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -28,6 +29,7 @@ local debugMode = false
 local godMode = false
 local minimapEnabled = CONFIG.MINIMAP_ENABLED
 local dailyChallengeEnabled = CONFIG.DAILY_CHALLENGE_ENABLED
+local stealthModeEnabled = false
 local timeAttackEnabled = CONFIG.TIME_ATTACK_MODE
 local currentSeed = nil  -- Track the seed being used
 local profilingEnabled = CONFIG.PROFILING_ENABLED
@@ -1464,6 +1466,9 @@ function love.load() -- load function that runs once at the beginning
     
     -- Initialize replay system
     Replay.init()
+    -- Initialize stealth system
+    Stealth.init()
+    
     
     debugMode = CONFIG.DEBUG_MODE
     godMode = CONFIG.GOD_MODE
@@ -1585,6 +1590,17 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             tPressed = false
         end
         
+        -- Toggle stealth mode
+        if love.keyboard.isDown("s") then
+            if not sPressed then
+                stealthModeEnabled = not stealthModeEnabled
+                sPressed = true
+                print("Stealth Mode:", stealthModeEnabled)
+            end
+        else
+            sPressed = false
+        end
+        
         -- View progression screen
         if love.keyboard.isDown("p") then
             if not pPressedTitle then
@@ -1622,6 +1638,13 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             
             -- Start replay recording
             Replay.startRecording(currentSeed, selectedDifficulty)
+            
+            -- Enable/disable stealth mode based on toggle
+            if stealthModeEnabled then
+                Stealth.enable()
+            else
+                Stealth.disable()
+            end
             
             currentMode = "gameScreen"
         elseif love.keyboard.isDown("escape") then
@@ -1827,6 +1850,11 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         -- Apply accessibility slow mode to monster speed
         local effectiveMonsterSpeed = Accessibility.getAdjustedSpeed(monsters.speed)
         AI.updateMonsters(world, player.coord, dt, effectiveMonsterSpeed, Effects.activeEffects.ghostSlow)
+        
+        -- Update stealth detection
+        if Stealth.isEnabled() then
+            Stealth.update(dt, player.coord, monsters.coord, walls.coord)
+        end
 
     -- MONSTER PROXIMITY CHECK & POSITIONAL AUDIO
 
@@ -2129,22 +2157,43 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             -- Then check collision damage
             for _, monsterCoord in ipairs(monsters.coord) do
                 if checkCollision(monsterCoord, player.coord) then
-                    if not godMode and not Effects.activeEffects.invincibility then
-                        player.coord[1], player.coord[2] = storedX, storedY
-                        player.alive = false
-                        stats.deaths = stats.deaths + 1
-                        
-                        -- Trigger player death event
-                        Events.trigger(Events.GAME_EVENTS.PLAYER_DEATH)
-                        
-                        Effects.spawn(player.coord[1], player.coord[2], "death")
-                        Effects.startScreenShake(10, 0.5)
-                        print("player died")
-                        love.audio.play(playerDeathSound)
-                    elseif Effects.activeEffects.invincibility then
-                        -- Just bounce back but don't die
-                        player.coord[1], player.coord[2] = storedX, storedY
-                        Effects.startScreenShake(3, 0.2) -- Lighter shake when invincible
+                    -- In stealth mode, collision doesn't kill - only detection does
+                    if Stealth.isEnabled() then
+                        if Stealth.isPlayerDetected() and not godMode and not Effects.activeEffects.invincibility then
+                            player.coord[1], player.coord[2] = storedX, storedY
+                            player.alive = false
+                            stats.deaths = stats.deaths + 1
+                            
+                            -- Trigger player death event
+                            Events.trigger(Events.GAME_EVENTS.PLAYER_DEATH)
+                            
+                            Effects.spawn(player.coord[1], player.coord[2], "death")
+                            Effects.startScreenShake(10, 0.5)
+                            print("player caught and killed")
+                            love.audio.play(playerDeathSound)
+                        else
+                            -- Just bounce back when not detected
+                            player.coord[1], player.coord[2] = storedX, storedY
+                        end
+                    else
+                        -- Normal mode - collision kills
+                        if not godMode and not Effects.activeEffects.invincibility then
+                            player.coord[1], player.coord[2] = storedX, storedY
+                            player.alive = false
+                            stats.deaths = stats.deaths + 1
+                            
+                            -- Trigger player death event
+                            Events.trigger(Events.GAME_EVENTS.PLAYER_DEATH)
+                            
+                            Effects.spawn(player.coord[1], player.coord[2], "death")
+                            Effects.startScreenShake(10, 0.5)
+                            print("player died")
+                            love.audio.play(playerDeathSound)
+                        elseif Effects.activeEffects.invincibility then
+                            -- Just bounce back but don't die
+                            player.coord[1], player.coord[2] = storedX, storedY
+                            Effects.startScreenShake(3, 0.2) -- Lighter shake when invincible
+                        end
                     end
                     -- love.event.quit()
                 end
@@ -2658,6 +2707,14 @@ function love.draw() -- draw function that runs once every frame
         
         -- Pop screen shake transform
         love.graphics.pop()
+        
+        -- Draw stealth UI overlay
+        if Stealth.isEnabled() and debugMode then
+            Stealth.drawVisionCones(world.monster.coord)
+        end
+        if Stealth.isEnabled() then
+            Stealth.drawDetectionUI()
+        end
 
     elseif currentMode == "winScreen" then
         UI.drawWinScreen(world, stats, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25}, dailyChallengeEnabled)
