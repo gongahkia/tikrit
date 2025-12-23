@@ -16,6 +16,7 @@ local Accessibility = require("modules/accessibility")
 local Hazards = require("modules/hazards")
 local Events = require("modules/events")
 local Progression = require("modules/progression")
+local Editor = require("modules/editor")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -1457,6 +1458,9 @@ function love.load() -- load function that runs once at the beginning
     -- Apply progression unlocks
     Progression.applyStartingUnlocks(world, Effects.activeEffects)
     
+    -- Initialize editor
+    Editor.init()
+    
     debugMode = CONFIG.DEBUG_MODE
     godMode = CONFIG.GOD_MODE
 
@@ -1524,6 +1528,12 @@ end
 function love.update(dt) -- update function that runs once every frame; dt is change in time and can be used for different tasks
 
     local updateStartTime = love.timer.getTime()
+
+    -- Level Editor mode takes priority
+    if Editor.isActive() then
+        Editor.update(dt)
+        return
+    end
 
     if currentMode == "titleScreen" then
         
@@ -2133,7 +2143,22 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                     if CONFIG.INVENTORY_ENABLED and not CONFIG.INSTANT_USE_ITEMS then
                         -- Add to inventory
                         local effect = math.random(1, 6)
-                        local effectNames = {\"speedBoost\", \"speedReduction\", \"ghostSlow\", \"invincibility\", \"mapReveal\", \"megaSpeed\"}\n                        local item = {effect = effectNames[effect]}\n                        \n                        if addItemToInventory(item) then\n                            table.remove(items.coord, i)\n                            love.audio.play(playerItemSound)\n                        end\n                    else\n                        -- Immediate use (original behavior)\n                        Effects.applyRandomItemEffect(world)\n                        table.remove(items.coord, i)\n                        stats.itemsUsed = stats.itemsUsed + 1\n                        love.audio.play(playerItemSound)\n                    end\n                end\n            end
+                        local effectNames = {"speedBoost", "speedReduction", "ghostSlow", "invincibility", "mapReveal", "megaSpeed"}
+                        local item = {effect = effectNames[effect]}
+                        
+                        if addItemToInventory(item) then
+                            table.remove(items.coord, i)
+                            love.audio.play(playerItemSound)
+                        end
+                    else
+                        -- Immediate use (original behavior)
+                        Effects.applyRandomItemEffect(world)
+                        table.remove(items.coord, i)
+                        stats.itemsUsed = stats.itemsUsed + 1
+                        love.audio.play(playerItemSound)
+                    end
+                end
+            end
 
         -- player and key
 
@@ -2260,6 +2285,12 @@ end
 function love.draw() -- draw function that runs once every frame
 
     local drawStartTime = love.timer.getTime()
+
+    -- Level Editor mode takes priority
+    if Editor.isActive() then
+        Editor.draw()
+        return
+    end
 
     if currentMode == "titleScreen" then
         UI.drawTitleScreen(difficultyMenuSelection, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25}, dailyChallengeEnabled, timeAttackEnabled)
@@ -2630,5 +2661,26 @@ function love.draw() -- draw function that runs once every frame
     -- Draw accessibility visual indicators
     if currentMode == "gameScreen" and CONFIG.VISUAL_AUDIO_INDICATORS then
         Accessibility.drawAudioIndicator(world.player.coord, world.monster.coord)
+    end
+end
+
+-- Keyboard input handler
+function love.keypressed(key)
+    -- Toggle editor mode
+    if key == "f5" then
+        Editor.toggle()
+        return
+    end
+    
+    -- Pass keypresses to editor when active
+    if Editor.isActive() then
+        Editor.keypressed(key)
+    end
+end
+
+-- Mouse release handler for editor
+function love.mousereleased(x, y, button)
+    if Editor.isActive() then
+        Editor.mousereleased(x, y, button)
     end
 end

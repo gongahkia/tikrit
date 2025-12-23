@@ -124,8 +124,7 @@ function UI.drawProgressionScreen(fonts)
     -- Instructions
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.print("Press ESC to return to title screen", (love.graphics.getWidth() - fonts.small:getWidth("Press ESC to return to title screen"))/2, 550)
-end
-    love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
+    love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth("Made by @gongahkia on Github in Love2D") - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
 end
 
 function UI.drawLoseScreen(world, stats, fonts)
