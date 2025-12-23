@@ -37,7 +37,8 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 
 ### Developer Features
 - Configuration-driven design via `config.lua`
-- Debug visualization mode for development
+- Debug visualization mode for development (F3)
+- Performance profiler with frame timing and memory tracking (F6)
 - Comprehensive statistics tracking
 - Modular AI system for easy expansion
 

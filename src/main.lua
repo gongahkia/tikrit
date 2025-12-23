@@ -23,6 +23,24 @@ local godMode = false
 local minimapEnabled = CONFIG.MINIMAP_ENABLED
 local dailyChallengeEnabled = CONFIG.DAILY_CHALLENGE_ENABLED
 local currentSeed = nil  -- Track the seed being used
+local profilingEnabled = CONFIG.PROFILING_ENABLED
+
+-- Performance profiling data
+local profiling = {
+    frameHistory = {},
+    updateTimeHistory = {},
+    drawTimeHistory = {},
+    memoryHistory = {},
+    updateTimer = 0,
+    currentUpdateTime = 0,
+    currentDrawTime = 0,
+    avgFPS = 0,
+    avgUpdateTime = 0,
+    avgDrawTime = 0,
+    avgMemory = 0,
+    minFPS = 999,
+    maxFPS = 0,
+}
 
 -- Player last movement for attack direction
 local lastMoveX = 0
@@ -242,6 +260,110 @@ function generateProceduralMap()
     -- Initialize visibility for fog of war
     if CONFIG.FOG_ENABLED then
         Utils.initVisibility(CONFIG.MAP_WIDTH, CONFIG.MAP_HEIGHT, CONFIG.TILE_SIZE)
+    end
+end
+
+-- Update performance profiling
+function updateProfiling(dt, updateTime, drawTime)
+    if not profilingEnabled then
+        return
+    end
+    
+    -- Update timer
+    profiling.updateTimer = profiling.updateTimer + dt
+    
+    -- Collect current frame data
+    local currentFPS = love.timer.getFPS()
+    local currentMemory = collectgarbage("count") / 1024  -- Convert to MB
+    
+    -- Add to history
+    table.insert(profiling.frameHistory, currentFPS)
+    table.insert(profiling.updateTimeHistory, updateTime * 1000)  -- Convert to ms
+    table.insert(profiling.drawTimeHistory, drawTime * 1000)  -- Convert to ms
+    table.insert(profiling.memoryHistory, currentMemory)
+    
+    -- Limit history size
+    if #profiling.frameHistory > CONFIG.PROFILING_HISTORY_SIZE then
+        table.remove(profiling.frameHistory, 1)
+        table.remove(profiling.updateTimeHistory, 1)
+        table.remove(profiling.drawTimeHistory, 1)
+        table.remove(profiling.memoryHistory, 1)
+    end
+    
+    -- Update statistics periodically
+    if profiling.updateTimer >= CONFIG.PROFILING_UPDATE_INTERVAL then
+        profiling.updateTimer = 0
+        
+        -- Calculate averages
+        local fpsSum, updateSum, drawSum, memSum = 0, 0, 0, 0
+        profiling.minFPS = 999
+        profiling.maxFPS = 0
+        
+        for i = 1, #profiling.frameHistory do
+            fpsSum = fpsSum + profiling.frameHistory[i]
+            updateSum = updateSum + profiling.updateTimeHistory[i]
+            drawSum = drawSum + profiling.drawTimeHistory[i]
+            memSum = memSum + profiling.memoryHistory[i]
+            
+            if profiling.frameHistory[i] < profiling.minFPS then
+                profiling.minFPS = profiling.frameHistory[i]
+            end
+            if profiling.frameHistory[i] > profiling.maxFPS then
+                profiling.maxFPS = profiling.frameHistory[i]
+            end
+        end
+        
+        local count = #profiling.frameHistory
+        if count > 0 then
+            profiling.avgFPS = fpsSum / count
+            profiling.avgUpdateTime = updateSum / count
+            profiling.avgDrawTime = drawSum / count
+            profiling.avgMemory = memSum / count
+        end
+    end
+end
+
+function drawProfilingOverlay()
+    if not profilingEnabled then
+        return
+    end
+    
+    -- Draw background panel
+    love.graphics.setColor(0, 0, 0, 0.8)
+    love.graphics.rectangle("fill", CONFIG.WINDOW_WIDTH - 310, 10, 300, 250)
+    
+    -- Draw border
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.rectangle("line", CONFIG.WINDOW_WIDTH - 310, 10, 300, 250)
+    
+    -- Draw profiling data
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setFont(AmaticFont25)
+    love.graphics.print("PERFORMANCE PROFILER (F6)", CONFIG.WINDOW_WIDTH - 305, 15)
+    
+    local y = 45
+    love.graphics.print(string.format("FPS: %d (avg: %.1f)", love.timer.getFPS(), profiling.avgFPS), CONFIG.WINDOW_WIDTH - 305, y)
+    y = y + 25
+    love.graphics.print(string.format("  Min: %d  Max: %d", profiling.minFPS, profiling.maxFPS), CONFIG.WINDOW_WIDTH - 305, y)
+    y = y + 25
+    
+    love.graphics.print(string.format("Frame Time: %.2f ms", profiling.avgUpdateTime + profiling.avgDrawTime), CONFIG.WINDOW_WIDTH - 305, y)
+    y = y + 25
+    love.graphics.print(string.format("  Update: %.2f ms", profiling.avgUpdateTime), CONFIG.WINDOW_WIDTH - 305, y)
+    y = y + 25
+    love.graphics.print(string.format("  Draw: %.2f ms", profiling.avgDrawTime), CONFIG.WINDOW_WIDTH - 305, y)
+    y = y + 25
+    
+    love.graphics.print(string.format("Memory: %.2f MB", profiling.avgMemory), CONFIG.WINDOW_WIDTH - 305, y)
+    y = y + 25
+    
+    -- Entity counts
+    if currentMode == "gameScreen" and world then
+        love.graphics.print(string.format("Entities:"), CONFIG.WINDOW_WIDTH - 305, y)
+        y = y + 25
+        love.graphics.print(string.format("  Monsters: %d", #world.monster.coord), CONFIG.WINDOW_WIDTH - 305, y)
+        y = y + 25
+        love.graphics.print(string.format("  Items: %d  Keys: %d", #world.item.coord, #world.key.coord), CONFIG.WINDOW_WIDTH - 305, y)
     end
 end
 
@@ -1288,6 +1410,8 @@ end
 
 function love.update(dt) -- update function that runs once every frame; dt is change in time and can be used for different tasks
 
+    local updateStartTime = love.timer.getTime()
+
     if currentMode == "titleScreen" then
         
         -- Handle difficulty selection
@@ -1568,6 +1692,25 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         else
             mPressed = false
         end
+        
+        -- profiling toggle (F6)
+        if love.keyboard.isDown("f6") then
+            if not f6Pressed then
+                profilingEnabled = not profilingEnabled
+                f6Pressed = true
+                print("Profiling:", profilingEnabled)
+                if profilingEnabled then
+                    -- Reset profiling data
+                    profiling.frameHistory = {}
+                    profiling.updateTimeHistory = {}
+                    profiling.drawTimeHistory = {}
+                    profiling.memoryHistory = {}
+                    profiling.updateTimer = 0
+                end
+            end
+        else
+            f6Pressed = false
+        end
 
         -- PLAYER MOVEMENT
 
@@ -1817,12 +1960,17 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         end
 
     end
+    
+    -- Track update time for profiling
+    if profilingEnabled then
+        profiling.currentUpdateTime = love.timer.getTime() - updateStartTime
+    end
 
 end
 
 function love.draw() -- draw function that runs once every frame
 
-    math.randomseed(os.time())
+    local drawStartTime = love.timer.getTime()
 
     if currentMode == "titleScreen" then
         UI.drawTitleScreen(difficultyMenuSelection, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25}, dailyChallengeEnabled)
@@ -2170,5 +2318,12 @@ function love.draw() -- draw function that runs once every frame
         UI.drawLoseScreen(world, stats, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25})
     elseif currentMode == "pauseScreen" then
         UI.drawPauseScreen(pauseMenuSelection, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25})
+    end
+    
+    -- Track draw time and update profiling
+    if profilingEnabled then
+        profiling.currentDrawTime = love.timer.getTime() - drawStartTime
+        updateProfiling(love.timer.getDelta(), profiling.currentUpdateTime, profiling.currentDrawTime)
+        drawProfilingOverlay()
     end
 end
