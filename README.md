@@ -28,6 +28,9 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 - **God Mode**: F4 (disable collision for testing)
 - **Fog of War Toggle**: F5 (enable/disable during gameplay)
 - **Performance Profiler**: F6 (shows FPS graph, frame times, memory usage)
+- **Colorblind Mode**: F7 (cycle through colorblind filters)
+- **High Contrast Mode**: F8 (toggle high contrast for better visibility)
+- **Slow Mode**: F9 (reduce all game speeds by 50% for accessibility)
 - **Minimap Toggle**: M (show/hide minimap overlay)
 - **Menu Navigation**: Up/Down arrows
 - **Menu Selection**: Enter
@@ -44,6 +47,7 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 - Configuration-driven design via `config.lua`
 - Debug visualization mode for development (F3)
 - Performance profiler with frame timing and memory tracking (F6)
+- Accessibility features: colorblind modes (F7), high contrast (F8), slow mode (F9), visual audio indicators
 - Comprehensive statistics tracking
 - Modular AI system for easy expansion
 

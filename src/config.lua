@@ -171,4 +171,13 @@ CONFIG.INVENTORY_ENABLED = true
 CONFIG.INVENTORY_SIZE = 3  -- Number of items player can hold
 CONFIG.INSTANT_USE_ITEMS = false  -- If true, items are used immediately on pickup
 
+-- Accessibility Options
+CONFIG.ACCESSIBILITY_ENABLED = true
+CONFIG.COLORBLIND_MODE = "none"  -- "none", "protanopia", "deuteranopia", "tritanopia"
+CONFIG.HIGH_CONTRAST_MODE = false  -- Enhance contrast for visibility
+CONFIG.SLOW_MODE = false  -- Reduce all speeds by 50%
+CONFIG.SLOW_MODE_MULTIPLIER = 0.5
+CONFIG.VISUAL_AUDIO_INDICATORS = true  -- Show visual indicators for sound cues
+CONFIG.FONT_SIZE_MULTIPLIER = 1.0  -- Adjust font sizes (0.8 to 1.5)
+
 return CONFIG

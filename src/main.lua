@@ -12,6 +12,7 @@ local Animation = require("modules/animation")
 local Audio = require("modules/audio")
 local Combat = require("modules/combat")
 local ProcGen = require("modules/procgen")
+local Accessibility = require("modules/accessibility")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -1656,7 +1657,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     -- ---------- ENTITY MOVEMENT -----------
 
     -- MONSTER MOVEMENT
-        AI.updateMonsters(world, player.coord, dt, monsters.speed, Effects.activeEffects.ghostSlow)
+        -- Apply accessibility slow mode to monster speed
+        local effectiveMonsterSpeed = Accessibility.getAdjustedSpeed(monsters.speed)
+        AI.updateMonsters(world, player.coord, dt, effectiveMonsterSpeed, Effects.activeEffects.ghostSlow)
 
     -- MONSTER PROXIMITY CHECK & POSITIONAL AUDIO
 
@@ -1794,6 +1797,40 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 key3Pressed = false
             end
         end
+        
+        -- Accessibility toggles
+        -- Toggle colorblind mode (F7)
+        if love.keyboard.isDown("f7") then
+            if not f7Pressed then
+                local newMode = Accessibility.cycleColorblindMode()
+                f7Pressed = true
+                print("Colorblind mode:", newMode)
+            end
+        else
+            f7Pressed = false
+        end
+        
+        -- Toggle high contrast (F8)
+        if love.keyboard.isDown("f8") then
+            if not f8Pressed then
+                CONFIG.HIGH_CONTRAST_MODE = not CONFIG.HIGH_CONTRAST_MODE
+                f8Pressed = true
+                print("High contrast mode:", CONFIG.HIGH_CONTRAST_MODE)
+            end
+        else
+            f8Pressed = false
+        end
+        
+        -- Toggle slow mode (F9)
+        if love.keyboard.isDown("f9") then
+            if not f9Pressed then
+                CONFIG.SLOW_MODE = not CONFIG.SLOW_MODE
+                f9Pressed = true
+                print("Slow mode:", CONFIG.SLOW_MODE)
+            end
+        else
+            f9Pressed = false
+        end
 
         -- PLAYER MOVEMENT
 
@@ -1801,23 +1838,26 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
 
             storedX, storedY = player.coord[1], player.coord[2]
             local moved = false
+            
+            -- Apply accessibility slow mode to player speed
+            local effectivePlayerSpeed = Accessibility.getAdjustedSpeed(player.speed)
 
             if love.keyboard.isDown("w") or love.keyboard.isDown("up") then 
-                player.coord[2] = player.coord[2] - (dt * player.speed)
+                player.coord[2] = player.coord[2] - (dt * effectivePlayerSpeed)
                 lastMoveX, lastMoveY = 0, -1
                 moved = true
             elseif love.keyboard.isDown("s") or love.keyboard.isDown("down") then 
-                player.coord[2] = player.coord[2] + (dt * player.speed)
+                player.coord[2] = player.coord[2] + (dt * effectivePlayerSpeed)
                 lastMoveX, lastMoveY = 0, 1
                 moved = true
             end
 
             if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
-                player.coord[1] = player.coord[1] - (dt * player.speed)
+                player.coord[1] = player.coord[1] - (dt * effectivePlayerSpeed)
                 lastMoveX, lastMoveY = -1, 0
                 moved = true
             elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
-                player.coord[1] = player.coord[1] + (dt * player.speed)
+                player.coord[1] = player.coord[1] + (dt * effectivePlayerSpeed)
                 lastMoveX, lastMoveY = 1, 0
                 moved = true
             end
@@ -2407,5 +2447,10 @@ function love.draw() -- draw function that runs once every frame
         profiling.currentDrawTime = love.timer.getTime() - drawStartTime
         updateProfiling(love.timer.getDelta(), profiling.currentUpdateTime, profiling.currentDrawTime)
         drawProfilingOverlay()
+    end
+    
+    -- Draw accessibility visual indicators
+    if currentMode == "gameScreen" and CONFIG.VISUAL_AUDIO_INDICATORS then
+        Accessibility.drawAudioIndicator(world.player.coord, world.monster.coord)
     end
 end
