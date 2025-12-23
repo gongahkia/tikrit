@@ -97,6 +97,7 @@ local world = {
         currRoom = "1",
         overallKeyCount = 0,
         alive = true,
+        inventory = {},  -- Holds items (max 3)
     }, 
 
     monster = {
@@ -364,6 +365,58 @@ function drawProfilingOverlay()
         love.graphics.print(string.format("  Monsters: %d", #world.monster.coord), CONFIG.WINDOW_WIDTH - 305, y)
         y = y + 25
         love.graphics.print(string.format("  Items: %d  Keys: %d", #world.item.coord, #world.key.coord), CONFIG.WINDOW_WIDTH - 305, y)
+    end
+end
+
+-- Inventory management functions
+function addItemToInventory(item)
+    if #world.player.inventory < CONFIG.INVENTORY_SIZE then
+        table.insert(world.player.inventory, item)
+        print("Added item to inventory slot " .. #world.player.inventory)
+        return true
+    else
+        print("Inventory full! Use an item first.")
+        return false
+    end
+end
+
+function useInventoryItem(slotNumber)
+    if world.player.inventory[slotNumber] then
+        local item = world.player.inventory[slotNumber]
+        print("Using item from slot " .. slotNumber)
+        
+        -- Apply the item's stored effect
+        if item.effect == "speedBoost" then
+            world.player.speed = world.player.speed + CONFIG.PLAYER_SPEED_BUFF
+        elseif item.effect == "speedReduction" then
+            world.player.speed = math.max(100, world.player.speed - 100)
+        elseif item.effect == "ghostSlow" then
+            activeEffects.ghostSlow = true
+            activeEffects.ghostSlowTimer = CONFIG.PLAYER_SPEED_BUFF_DURATION
+        elseif item.effect == "invincibility" then
+            activeEffects.invincibility = true
+            activeEffects.invincibilityTimer = CONFIG.INVINCIBILITY_DURATION
+        elseif item.effect == "mapReveal" then
+            activeEffects.mapReveal = true
+            activeEffects.mapRevealTimer = CONFIG.MAP_REVEAL_DURATION
+            for y = 0, CONFIG.MAP_HEIGHT, CONFIG.TILE_SIZE do
+                for x = 0, CONFIG.MAP_WIDTH, CONFIG.TILE_SIZE do
+                    local key = x .. "," .. y
+                    currentVisibleTiles[key] = true
+                end
+            end
+        elseif item.effect == "megaSpeed" then
+            world.player.speed = world.player.speed + CONFIG.PLAYER_SPEED_BUFF * 2
+        end
+        
+        -- Remove item from inventory
+        table.remove(world.player.inventory, slotNumber)
+        stats.itemsUsed = stats.itemsUsed + 1
+        
+        return true
+    else
+        print("No item in slot " .. slotNumber)
+        return false
     end
 end
 
@@ -1711,6 +1764,36 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         else
             f6Pressed = false
         end
+        
+        -- Inventory item usage (1, 2, 3)
+        if CONFIG.INVENTORY_ENABLED then
+            if love.keyboard.isDown("1") then
+                if not key1Pressed then
+                    useInventoryItem(1)
+                    key1Pressed = true
+                end
+            else
+                key1Pressed = false
+            end
+            
+            if love.keyboard.isDown("2") then
+                if not key2Pressed then
+                    useInventoryItem(2)
+                    key2Pressed = true
+                end
+            else
+                key2Pressed = false
+            end
+            
+            if love.keyboard.isDown("3") then
+                if not key3Pressed then
+                    useInventoryItem(3)
+                    key3Pressed = true
+                end
+            else
+                key3Pressed = false
+            end
+        end
 
         -- PLAYER MOVEMENT
 
@@ -1858,12 +1941,11 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             for i, itemCoord in ipairs(items.coord) do 
                 if checkCollision(itemCoord, player.coord) then
                     Effects.spawn(itemCoord[1], itemCoord[2], "item")
-                    Effects.applyRandomItemEffect(world)
-                    table.remove(items.coord, i)
-                    stats.itemsUsed = stats.itemsUsed + 1
-                    love.audio.play(playerItemSound)
-                end
-            end
+                    
+                    if CONFIG.INVENTORY_ENABLED and not CONFIG.INSTANT_USE_ITEMS then
+                        -- Add to inventory
+                        local effect = math.random(1, 6)
+                        local effectNames = {\"speedBoost\", \"speedReduction\", \"ghostSlow\", \"invincibility\", \"mapReveal\", \"megaSpeed\"}\n                        local item = {effect = effectNames[effect]}\n                        \n                        if addItemToInventory(item) then\n                            table.remove(items.coord, i)\n                            love.audio.play(playerItemSound)\n                        end\n                    else\n                        -- Immediate use (original behavior)\n                        Effects.applyRandomItemEffect(world)\n                        table.remove(items.coord, i)\n                        stats.itemsUsed = stats.itemsUsed + 1\n                        love.audio.play(playerItemSound)\n                    end\n                end\n            end
 
         -- player and key
 

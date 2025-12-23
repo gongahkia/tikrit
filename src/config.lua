@@ -166,4 +166,9 @@ CONFIG.PROFILING_ENABLED = false  -- Toggle with F6
 CONFIG.PROFILING_HISTORY_SIZE = 60  -- Number of frames to track
 CONFIG.PROFILING_UPDATE_INTERVAL = 0.5  -- Update stats every 0.5s
 
+-- Inventory System
+CONFIG.INVENTORY_ENABLED = true
+CONFIG.INVENTORY_SIZE = 3  -- Number of items player can hold
+CONFIG.INSTANT_USE_ITEMS = false  -- If true, items are used immediately on pickup
+
 return CONFIG

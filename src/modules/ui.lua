@@ -134,23 +134,40 @@ end
 function UI.drawHUD(world, activeEffects, debugMode, fonts)
     if not debugMode then
         love.graphics.setColor(0, 0, 0, 0.7)
-        love.graphics.rectangle("fill", 0, 0, 200, 100)
+        love.graphics.rectangle("fill", 0, 0, 200, 140)
         
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.setFont(fonts.small)
         love.graphics.print("Keys: " .. world.player.overallKeyCount .. "/" .. world.key.globalCount, 10, 10)
         love.graphics.print("Room: " .. world.player.currRoom, 10, 35)
         
+        -- Show inventory
+        local CONFIG = require("config")
+        if CONFIG.INVENTORY_ENABLED then
+            love.graphics.print("Inventory (1-3):", 10, 60)
+            for i = 1, CONFIG.INVENTORY_SIZE do
+                local item = world.player.inventory[i]
+                if item then
+                    love.graphics.setColor(0, 1, 1, 1)  -- Cyan for items
+                    love.graphics.print(i .. ": Item", 10, 60 + (i * 20))
+                else
+                    love.graphics.setColor(0.5, 0.5, 0.5, 1)  -- Gray for empty
+                    love.graphics.print(i .. ": ---", 10, 60 + (i * 20))
+                end
+            end
+        end
+        
         -- Show active effects
+        love.graphics.setColor(1, 1, 1, 1)
         if activeEffects.invincibility then
             love.graphics.setColor(1, 1, 0, 1)
-            love.graphics.print("Invincible!", 10, 60)
+            love.graphics.print("Invincible!", 10, 130)
         elseif activeEffects.ghostSlow then
             love.graphics.setColor(0, 1, 1, 1)
-            love.graphics.print("Ghosts Slowed", 10, 60)
+            love.graphics.print("Ghosts Slowed", 10, 130)
         elseif activeEffects.mapReveal then
             love.graphics.setColor(1, 0.5, 0, 1)
-            love.graphics.print("Map Revealed", 10, 60)
+            love.graphics.print("Map Revealed", 10, 130)
         end
     end
 end

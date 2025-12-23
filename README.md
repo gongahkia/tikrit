@@ -12,6 +12,7 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 ### Gameplay
 - **Four Difficulty Levels**: Easy, Normal, Hard, and Nightmare modes
 - **Daily Challenge Mode**: Fixed seed based on current date - everyone plays the same map each day (toggle with D on title screen)
+- **Inventory System**: Hold up to 3 items and use them strategically with number keys (1-3)
 - **Fog of War System**: Limited vision radius with memory of previously visited areas
 - **Smart Ghost AI**: Two distinct AI behaviors (aggressive chase and territorial patrol)
 - **Dynamic Item Effects**: Random effects from potions (speed boost, invincibility, ghost slow, map reveal, etc.)
@@ -20,18 +21,22 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 
 ### Controls
 - **Movement**: WASD or Arrow Keys
-- **Paily Challenge Toggle**: D (on title screen)
-- **Dause**: P or ESC
+- **Use Inventory Items**: 1, 2, 3 (use items in inventory slots)
+- **Pause**: P or ESC
+- **Daily Challenge Toggle**: D (on title screen)
 - **Debug Mode**: F3 (shows FPS, collision boxes, AI vectors, stats)
 - **God Mode**: F4 (disable collision for testing)
 - **Fog of War Toggle**: F5 (enable/disable during gameplay)
+- **Performance Profiler**: F6 (shows FPS graph, frame times, memory usage)
 - **Minimap Toggle**: M (show/hide minimap overlay)
 - **Menu Navigation**: Up/Down arrows
+- **Menu Selection**: Enter
 - **Menu Selection**: Enter
 
 ### HUD
 - Key collection progress
 - Current room number  
+- Inventory display (3 item slots - use with 1, 2, 3 keys)
 - Active effect indicators (Invincible, Ghosts Slowed, Map Revealed)
 - Minimap overlay (toggle with M) showing current room layout, player position, ghosts, keys, and items
 
