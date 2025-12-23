@@ -12,6 +12,7 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 ### Gameplay
 - **Four Difficulty Levels**: Easy, Normal, Hard, and Nightmare modes
 - **Daily Challenge Mode**: Fixed seed based on current date - everyone plays the same map each day (toggle with D on title screen)
+- **Time Attack Mode**: Race against par times with speed scaling and time bonuses (toggle with T on title screen)
 - **Inventory System**: Hold up to 3 items and use them strategically with number keys (1-3)
 - **Room Hazards**: Spike traps, pressure plates, timed rooms, and dark zones add environmental dangers
 - **Fog of War System**: Limited vision radius with memory of previously visited areas
@@ -25,6 +26,7 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 - **Use Inventory Items**: 1, 2, 3 (use items in inventory slots)
 - **Pause**: P or ESC
 - **Daily Challenge Toggle**: D (on title screen)
+- **Time Attack Toggle**: T (on title screen)
 - **Debug Mode**: F3 (shows FPS, collision boxes, AI vectors, stats)
 - **God Mode**: F4 (disable collision for testing)
 - **Fog of War Toggle**: F5 (enable/disable during gameplay)
@@ -34,7 +36,6 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 - **Slow Mode**: F9 (reduce all game speeds by 50% for accessibility)
 - **Minimap Toggle**: M (show/hide minimap overlay)
 - **Menu Navigation**: Up/Down arrows
-- **Menu Selection**: Enter
 - **Menu Selection**: Enter
 
 ### HUD

@@ -24,8 +24,19 @@ local debugMode = false
 local godMode = false
 local minimapEnabled = CONFIG.MINIMAP_ENABLED
 local dailyChallengeEnabled = CONFIG.DAILY_CHALLENGE_ENABLED
+local timeAttackEnabled = CONFIG.TIME_ATTACK_MODE
 local currentSeed = nil  -- Track the seed being used
 local profilingEnabled = CONFIG.PROFILING_ENABLED
+
+-- Time Attack tracking
+local timeAttack = {
+    enabled = false,
+    gameStartTime = 0,
+    elapsedGameTime = 0,
+    parTime = 0,
+    itemBonus = 0,
+    lastSpeedIncrease = 0,  -- Track when we last increased speed
+}
 
 -- Performance profiling data
 local profiling = {
@@ -1406,6 +1417,17 @@ function love.load() -- load function that runs once at the beginning
     stats.startTime = love.timer.getTime()
     stats.roomsVisited = {[world.player.currRoom] = true}
     
+    -- Initialize time attack mode
+    if timeAttackEnabled then
+        timeAttack.enabled = true
+        timeAttack.gameStartTime = love.timer.getTime()
+        timeAttack.elapsedGameTime = 0
+        timeAttack.parTime = CONFIG.TIME_ATTACK_PAR_TIMES[CONFIG.DIFFICULTY] or 180
+        timeAttack.itemBonus = 0
+        timeAttack.lastSpeedIncrease = 0
+        print("Time Attack Mode - Par Time: " .. timeAttack.parTime .. "s")
+    end
+    
     debugMode = CONFIG.DEBUG_MODE
     godMode = CONFIG.GOD_MODE
 
@@ -1504,6 +1526,17 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             end
         else
             dPressed = false
+        end
+        
+        -- Toggle time attack mode
+        if love.keyboard.isDown("t") then
+            if not tPressed then
+                timeAttackEnabled = not timeAttackEnabled
+                tPressed = true
+                print("Time Attack Mode:", timeAttackEnabled)
+            end
+        else
+            tPressed = false
         end
 
         if love.keyboard.isDown("return") then
@@ -1682,6 +1715,20 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         end
 
         -- print(player.speed)
+        
+    -- ---------- TIME ATTACK MODE -----------
+    
+        if timeAttack.enabled and player.alive then
+            -- Update elapsed time
+            timeAttack.elapsedGameTime = love.timer.getTime() - timeAttack.gameStartTime
+            
+            -- Speed scaling: increase ghost speed over time
+            if timeAttack.elapsedGameTime - timeAttack.lastSpeedIncrease >= CONFIG.TIME_ATTACK_SPEED_INCREASE_INTERVAL then
+                world.monster.speed = world.monster.speed + CONFIG.TIME_ATTACK_SPEED_INCREASE_AMOUNT
+                timeAttack.lastSpeedIncrease = timeAttack.elapsedGameTime
+                print(string.format("Time Attack: Speed increased! Ghosts now at %d speed", world.monster.speed))
+            end
+        end
 
     -- ---------- ENTITY MOVEMENT -----------
 
@@ -2124,7 +2171,7 @@ function love.draw() -- draw function that runs once every frame
     local drawStartTime = love.timer.getTime()
 
     if currentMode == "titleScreen" then
-        UI.drawTitleScreen(difficultyMenuSelection, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25}, dailyChallengeEnabled)
+        UI.drawTitleScreen(difficultyMenuSelection, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25}, dailyChallengeEnabled, timeAttackEnabled)
     elseif currentMode == "gameScreen" then -- draw game
 
         playerCoord = world.player.coord
@@ -2372,6 +2419,9 @@ function love.draw() -- draw function that runs once every frame
         
         -- DRAW TIMED ROOM UI
         Hazards.drawTimedRoomUI()
+        
+        -- DRAW TIME ATTACK UI
+        UI.drawTimeAttackUI(timeAttack, {small = AmaticFont25})
         
         -- DRAW MINIMAP
         if minimapEnabled and not debugMode then

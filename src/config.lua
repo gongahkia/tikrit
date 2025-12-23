@@ -191,4 +191,16 @@ CONFIG.TIMED_ROOM_DURATION = 30  -- Time limit for timed rooms (seconds)
 CONFIG.TIMED_ROOM_WARNING_TIME = 10  -- When to start warning (seconds remaining)
 CONFIG.DARK_ZONE_VISION_MULTIPLIER = 0.5  -- Vision radius multiplier in dark zones
 
+-- Time Attack Mode
+CONFIG.TIME_ATTACK_MODE = false  -- Toggle time attack mode
+CONFIG.TIME_ATTACK_PAR_TIMES = {  -- Par times in seconds for each difficulty
+    easy = 300,      -- 5 minutes
+    normal = 180,    -- 3 minutes
+    hard = 120,      -- 2 minutes
+    nightmare = 90   -- 1.5 minutes
+}
+CONFIG.TIME_ATTACK_SPEED_INCREASE_INTERVAL = 30  -- Increase speed every 30 seconds
+CONFIG.TIME_ATTACK_SPEED_INCREASE_AMOUNT = 5  -- Increase ghost speed by 5
+CONFIG.TIME_BONUS_PER_ITEM = 5  -- Bonus seconds for collecting items
+
 return CONFIG

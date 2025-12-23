@@ -4,7 +4,7 @@ local CONFIG = require("config")
 local UI = {}
 
 -- Draw functions for various screens
-function UI.drawTitleScreen(difficultyMenuSelection, fonts, dailyChallengeEnabled)
+function UI.drawTitleScreen(difficultyMenuSelection, fonts, dailyChallengeEnabled, timeAttackEnabled)
     local text1 = "TIKRIT"
     local text2 = "Select Difficulty"
     local text3 = "Made by @gongahkia on Github in Love2D"
@@ -29,18 +29,30 @@ function UI.drawTitleScreen(difficultyMenuSelection, fonts, dailyChallengeEnable
         end
     end
     
-    -- Daily challenge indicator
+    -- Mode indicators
     love.graphics.setFont(fonts.small)
+    local yOffset = 420
+    
+    -- Daily challenge indicator
     if dailyChallengeEnabled then
         love.graphics.setColor(1, 0.84, 0, 1)  -- Gold for daily challenge
         local Utils = require("modules/utils")
         local dailyText = "DAILY CHALLENGE: " .. Utils.getDailyDateString()
-        love.graphics.print(dailyText, (love.graphics.getWidth() - fonts.small:getWidth(dailyText))/2, 420)
+        love.graphics.print(dailyText, (love.graphics.getWidth() - fonts.small:getWidth(dailyText))/2, yOffset)
+        yOffset = yOffset + 25
+    end
+    
+    -- Time attack indicator
+    if timeAttackEnabled then
+        love.graphics.setColor(1, 0.4, 0.4, 1)  -- Red for time attack
+        local timeAttackText = "TIME ATTACK MODE ENABLED"
+        love.graphics.print(timeAttackText, (love.graphics.getWidth() - fonts.small:getWidth(timeAttackText))/2, yOffset)
+        yOffset = yOffset + 25
     end
     
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.print("Use UP/DOWN arrows to select, ENTER to start", (love.graphics.getWidth() - fonts.small:getWidth("Use UP/DOWN arrows to select, ENTER to start"))/2, 460)
-    love.graphics.print("Press D to toggle Daily Challenge mode", (love.graphics.getWidth() - fonts.small:getWidth("Press D to toggle Daily Challenge mode"))/2, 485)
+    love.graphics.print("Press D to toggle Daily Challenge | T to toggle Time Attack", (love.graphics.getWidth() - fonts.small:getWidth("Press D to toggle Daily Challenge | T to toggle Time Attack"))/2, 485)
     love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
 end
 
@@ -279,4 +291,47 @@ function UI.calculateGrade(deaths, elapsedTime)
     end
 end
 
+-- Draw time attack UI (timer, par time, bonuses)
+function UI.drawTimeAttackUI(timeAttack, fonts)
+    if not timeAttack.enabled then return end
+    
+    love.graphics.setFont(fonts.small)
+    
+    -- Calculate adjusted time (actual time - bonuses)
+    local adjustedTime = math.max(0, timeAttack.elapsedGameTime - timeAttack.itemBonus)
+    local minutes = math.floor(adjustedTime / 60)
+    local seconds = math.floor(adjustedTime % 60)
+    local parMinutes = math.floor(timeAttack.parTime / 60)
+    local parSeconds = math.floor(timeAttack.parTime % 60)
+    
+    -- Determine color based on performance
+    local color
+    if adjustedTime < timeAttack.parTime * 0.8 then
+        color = {0, 1, 0, 1}  -- Green - excellent
+    elseif adjustedTime < timeAttack.parTime then
+        color = {1, 1, 0, 1}  -- Yellow - good
+    elseif adjustedTime < timeAttack.parTime * 1.2 then
+        color = {1, 0.6, 0, 1}  -- Orange - par
+    else
+        color = {1, 0, 0, 1}  -- Red - over par
+    end
+    
+    -- Draw timer
+    love.graphics.setColor(unpack(color))
+    local timerText = string.format("Time: %02d:%02d", minutes, seconds)
+    love.graphics.print(timerText, 10, 60)
+    
+    -- Draw par time
+    love.graphics.setColor(0.7, 0.7, 0.7, 1)
+    local parText = string.format("Par: %02d:%02d", parMinutes, parSeconds)
+    love.graphics.print(parText, 10, 85)
+    
+    -- Draw bonus time if any
+    if timeAttack.itemBonus > 0 then
+        love.graphics.setColor(0, 1, 0, 1)
+        love.graphics.print(string.format("Bonus: -%ds", timeAttack.itemBonus), 10, 110)
+    end
+end
+
 return UI
+
