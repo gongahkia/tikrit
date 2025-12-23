@@ -14,6 +14,7 @@ local Combat = require("modules/combat")
 local ProcGen = require("modules/procgen")
 local Accessibility = require("modules/accessibility")
 local Hazards = require("modules/hazards")
+local Events = require("modules/events")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -1428,6 +1429,27 @@ function love.load() -- load function that runs once at the beginning
         print("Time Attack Mode - Par Time: " .. timeAttack.parTime .. "s")
     end
     
+    -- Setup event listeners (demonstrating event system)
+    Events.on(Events.GAME_EVENTS.KEY_COLLECTED, function(keyCoord)
+        print("[Event] Key collected at", keyCoord[1], keyCoord[2])
+    end)
+    
+    Events.on(Events.GAME_EVENTS.MONSTER_KILLED, function(monsterIndex)
+        print("[Event] Monster", monsterIndex, "defeated")
+    end)
+    
+    Events.on(Events.GAME_EVENTS.PLAYER_DEATH, function()
+        print("[Event] Player died - Game Over")
+    end)
+    
+    Events.on(Events.GAME_EVENTS.ROOM_ENTERED, function(roomName)
+        print("[Event] Entered room:", roomName)
+    end)
+    
+    Events.on(Events.GAME_EVENTS.ITEM_COLLECTED, function(itemType)
+        print("[Event] Item collected:", itemType)
+    end)
+    
     debugMode = CONFIG.DEBUG_MODE
     godMode = CONFIG.GOD_MODE
 
@@ -1626,6 +1648,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             deserialize(string.format("map/%s.txt",nextRoom)) -- load new room data
             player.currRoom = nextRoom
             player.coord = playerLoc[2] -- new player location
+            
+            -- Trigger room entered event
+            Events.trigger(Events.GAME_EVENTS.ROOM_ENTERED, nextRoom)
             
             -- Track room visit
             if not stats.roomsVisited[nextRoom] then
@@ -2000,6 +2025,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                             print("Monster " .. i .. " defeated!")
                             Effects.spawn(monsterCoord[1], monsterCoord[2], "death")
                             
+                            -- Trigger monster killed event
+                            Events.trigger(Events.GAME_EVENTS.MONSTER_KILLED, i)
+                            
                             -- Drop loot (key or item)
                             math.randomseed(os.time() + i)
                             local dropRoll = math.random()
@@ -2039,6 +2067,10 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                         player.coord[1], player.coord[2] = storedX, storedY
                         player.alive = false
                         stats.deaths = stats.deaths + 1
+                        
+                        -- Trigger player death event
+                        Events.trigger(Events.GAME_EVENTS.PLAYER_DEATH)
+                        
                         Effects.spawn(player.coord[1], player.coord[2], "death")
                         Effects.startScreenShake(10, 0.5)
                         print("player died")
@@ -2070,6 +2102,10 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                     
                     Effects.spawn(keyCoord[1], keyCoord[2], "key")
                     Animation.startChestOpening(keyCoord[1], keyCoord[2])
+                    
+                    -- Trigger key collected event
+                    Events.trigger(Events.GAME_EVENTS.KEY_COLLECTED, keyCoord)
+                    
                     table.remove(keys.coord, q)
                     player.keyCount = player.keyCount + 1
                     player.overallKeyCount = player.overallKeyCount + 1
@@ -2081,6 +2117,10 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                         print("all keys collected, opening doors")
                         love.audio.play(doorOpenSound)
                         doors.coord = {}
+                        
+                        -- Trigger door opened event
+                        Events.trigger(Events.GAME_EVENTS.DOOR_OPENED)
+                        
                         -- Spawn door particles and animations for all opened doors
                         for _, doorCoord in ipairs(openedDoorSpriteCoords) do
                             Effects.spawn(doorCoord[1], doorCoord[2], "door")

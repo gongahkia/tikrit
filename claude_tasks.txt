@@ -3,7 +3,7 @@
 # Focus: Industry-relevant features, educational value, roguelike design patterns
 # Philosophy: Keep it simple, reuse existing assets, demonstrate best practices
 
-# IMPLEMENTATION STATUS: 23/34 recommendations completed as of 2024-12-23
+# IMPLEMENTATION STATUS: 25/34 recommendations completed as of 2024-12-23
 # See CHANGELOG.md for detailed implementation notes
 
 ================================================================================
@@ -19,6 +19,8 @@ COMPLETED FEATURES (✅)
 8. Modular Code Refactoring (Recommendation #8)
 9. Configuration-Driven Design (Recommendation #9)
 10. Debug Visualization Mode (Recommendation #10)
+11. State Machine Implementation (Recommendation #11)
+12. Event System / Observer Pattern (Recommendation #12)
 13. Procedural Room Content Generation (Recommendation #13)
 15. Inventory & Item Management (Recommendation #15)
 16. Combat System (Recommendation #16)
@@ -253,8 +255,9 @@ SECTION B: CODE QUALITY & ARCHITECTURE (For Practitioners)
     Code Location: main.lua:990-1134 (love.draw), main.lua:757-988 (love.update)
     Suggested Approach: Add debugMode boolean, conditional rendering of debug info
 
-11. STATE MACHINE IMPLEMENTATION
+11. STATE MACHINE IMPLEMENTATION ✅ COMPLETED
     Priority: MEDIUM | Difficulty: Medium | Impact: Medium
+    Status: Implemented base State class and StateMachine manager with state stacking
 
     Implementation:
     - Replace currentMode string with proper state machine
@@ -271,8 +274,9 @@ SECTION B: CODE QUALITY & ARCHITECTURE (For Practitioners)
     Code Location: main.lua:5 (currentMode), main.lua:761-987 (state logic)
     Suggested Approach: Create state.lua base class, implement state classes
 
-12. EVENT SYSTEM / OBSERVER PATTERN
+12. EVENT SYSTEM / OBSERVER PATTERN ✅ COMPLETED
     Priority: LOW | Difficulty: Medium | Impact: Medium
+    Status: Implemented event bus with listeners, integrated throughout codebase
 
     Implementation:
     - Event bus for decoupled communication
