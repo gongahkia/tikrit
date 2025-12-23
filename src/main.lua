@@ -19,6 +19,7 @@ local Progression = require("modules/progression")
 local Editor = require("modules/editor")
 local Replay = require("modules/replay")
 local Stealth = require("modules/stealth")
+local Puzzle = require("modules/puzzle")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -30,6 +31,7 @@ local godMode = false
 local minimapEnabled = CONFIG.MINIMAP_ENABLED
 local dailyChallengeEnabled = CONFIG.DAILY_CHALLENGE_ENABLED
 local stealthModeEnabled = false
+local puzzleModeEnabled = false
 local timeAttackEnabled = CONFIG.TIME_ATTACK_MODE
 local currentSeed = nil  -- Track the seed being used
 local profilingEnabled = CONFIG.PROFILING_ENABLED
@@ -1466,9 +1468,12 @@ function love.load() -- load function that runs once at the beginning
     
     -- Initialize replay system
     Replay.init()
+    
     -- Initialize stealth system
     Stealth.init()
     
+    -- Initialize puzzle system
+    Puzzle.init()
     
     debugMode = CONFIG.DEBUG_MODE
     godMode = CONFIG.GOD_MODE
@@ -1601,6 +1606,17 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             sPressed = false
         end
         
+        -- Toggle puzzle mode
+        if love.keyboard.isDown("z") then
+            if not zPressed then
+                puzzleModeEnabled = not puzzleModeEnabled
+                zPressed = true
+                print("Puzzle Mode:", puzzleModeEnabled)
+            end
+        else
+            zPressed = false
+        end
+        
         -- View progression screen
         if love.keyboard.isDown("p") then
             if not pPressedTitle then
@@ -1644,6 +1660,13 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 Stealth.enable()
             else
                 Stealth.disable()
+            end
+            
+            -- Enable/disable puzzle mode based on toggle
+            if puzzleModeEnabled then
+                Puzzle.enable()
+            else
+                Puzzle.disable()
             end
             
             currentMode = "gameScreen"
@@ -1849,11 +1872,30 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
     -- MONSTER MOVEMENT
         -- Apply accessibility slow mode to monster speed
         local effectiveMonsterSpeed = Accessibility.getAdjustedSpeed(monsters.speed)
-        AI.updateMonsters(world, player.coord, dt, effectiveMonsterSpeed, Effects.activeEffects.ghostSlow)
+        
+        -- Disable monsters in puzzle mode
+        if not Puzzle.isEnabled() then
+            AI.updateMonsters(world, player.coord, dt, effectiveMonsterSpeed, Effects.activeEffects.ghostSlow)
+        end
         
         -- Update stealth detection
         if Stealth.isEnabled() then
             Stealth.update(dt, player.coord, monsters.coord, walls.coord)
+        end
+        
+        -- Update puzzle logic
+        local moveDir = nil
+        if love.keyboard.isDown("w", "up") then
+            moveDir = {0, -1}
+        elseif love.keyboard.isDown("s", "down") then
+            moveDir = {0, 1}
+        elseif love.keyboard.isDown("a", "left") then
+            moveDir = {-1, 0}
+        elseif love.keyboard.isDown("d", "right") then
+            moveDir = {1, 0}
+        end
+        if Puzzle.isEnabled() then
+            Puzzle.update(dt, player.coord, moveDir ~= nil, moveDir)
         end
 
     -- MONSTER PROXIMITY CHECK & POSITIONAL AUDIO
@@ -2707,6 +2749,11 @@ function love.draw() -- draw function that runs once every frame
         
         -- Pop screen shake transform
         love.graphics.pop()
+        
+        -- Draw puzzle UI
+        if Puzzle.isEnabled() then
+            Puzzle.drawUI()
+        end
         
         -- Draw stealth UI overlay
         if Stealth.isEnabled() and debugMode then
