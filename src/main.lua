@@ -882,6 +882,34 @@ function randomWall(worldMap)
     return fin
 end
 
+-- Generate floor sprite map for procedural generation
+function generateProcgenFloorMap()
+    local floorMap = {}
+    local tem = {}
+    for y = 0, CONFIG.MAP_HEIGHT - CONFIG.TILE_SIZE, CONFIG.TILE_SIZE do
+        for x = 0, CONFIG.MAP_WIDTH - CONFIG.TILE_SIZE, CONFIG.TILE_SIZE do
+            local i = math.random(1, 2)
+            table.insert(tem, {{x, y}, i})
+        end
+    end
+    table.insert(floorMap, {"procgen", tem})
+    return floorMap
+end
+
+-- Generate wall sprite map for procedural generation
+function generateProcgenWallMap()
+    local wallMap = {}
+    local tem = {}
+    for y = 0, CONFIG.MAP_HEIGHT - CONFIG.TILE_SIZE, CONFIG.TILE_SIZE do
+        for x = 0, CONFIG.MAP_WIDTH - CONFIG.TILE_SIZE, CONFIG.TILE_SIZE do
+            local i = math.random(1, 3)
+            table.insert(tem, {{x, y}, i})
+        end
+    end
+    table.insert(wallMap, {"procgen", tem})
+    return wallMap
+end
+
 -- aggregates every other pixel to create a pixellated shader texture
 local pixelateShaderCode = [[
     extern float pixelSize;
@@ -1393,9 +1421,9 @@ function love.load() -- load function that runs once at the beginning
         generateProceduralMap()
         worldMap = {}  -- Empty world map for procgen
         world.player.currRoom = "procgen"
-        -- Initialize empty floor/wall maps for compatibility
-        randomFloorMap = {}
-        randomWallMap = {}
+        -- Generate floor/wall sprite maps for procgen
+        randomFloorMap = generateProcgenFloorMap()
+        randomWallMap = generateProcgenWallMap()
         doorList = {}
         openedDoorSpriteCoords = {}
     else
