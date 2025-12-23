@@ -144,7 +144,7 @@ CONFIG.PROCGEN_CAVE_FILL_PERCENT = 45  -- for cellular automata
 CONFIG.PROCGEN_CAVE_SMOOTH_ITERATIONS = 5
 
 -- Minimap settings
-CONFIG.MINIMAP_ENABLED = true
+CONFIG.MINIMAP_ENABLED = false
 CONFIG.MINIMAP_TOGGLE_KEY = "m"  -- Toggle minimap with M key
 CONFIG.MINIMAP_SIZE = 150  -- Size of minimap in pixels
 CONFIG.MINIMAP_POSITION_X = 10  -- X position (from left)
