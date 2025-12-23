@@ -53,6 +53,78 @@ function UI.drawTitleScreen(difficultyMenuSelection, fonts, dailyChallengeEnable
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.print("Use UP/DOWN arrows to select, ENTER to start", (love.graphics.getWidth() - fonts.small:getWidth("Use UP/DOWN arrows to select, ENTER to start"))/2, 460)
     love.graphics.print("Press D to toggle Daily Challenge | T to toggle Time Attack", (love.graphics.getWidth() - fonts.small:getWidth("Press D to toggle Daily Challenge | T to toggle Time Attack"))/2, 485)
+    love.graphics.print("Press P to view Progression & Unlocks", (love.graphics.getWidth() - fonts.small:getWidth("Press P to view Progression & Unlocks"))/2, 510)
+    love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
+end
+
+-- Draw progression/unlocks screen
+function UI.drawProgressionScreen(fonts)
+    local Progression = require("modules/progression")
+    
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.setFont(fonts.large)
+    local title = "PROGRESSION & UNLOCKS"
+    love.graphics.print(title, (love.graphics.getWidth() - fonts.large:getWidth(title))/2, 30)
+    
+    love.graphics.setFont(fonts.small)
+    
+    -- Overall stats
+    love.graphics.setColor(0.7, 0.7, 1, 1)
+    love.graphics.print("Overall Statistics:", 50, 100)
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.print(string.format("Total Runs: %d", Progression.data.totalRuns), 70, 125)
+    love.graphics.print(string.format("Total Wins: %d", Progression.data.totalWins), 70, 145)
+    love.graphics.print(string.format("Total Deaths: %d", Progression.data.totalDeaths), 70, 165)
+    love.graphics.print(string.format("Keys Collected: %d", Progression.data.totalKeysCollected), 70, 185)
+    love.graphics.print(string.format("Monsters Killed: %d", Progression.data.totalMonstersKilled), 70, 205)
+    local fastestTime = Progression.data.fastestTime < math.huge and string.format("%.1fs", Progression.data.fastestTime) or "N/A"
+    love.graphics.print("Fastest Time: " .. fastestTime, 70, 225)
+    
+    -- Unlocks
+    love.graphics.setColor(0.7, 1, 0.7, 1)
+    love.graphics.print("Unlocked Abilities:", 50, 270)
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    
+    local unlockY = 295
+    local unlocks = Progression.data.unlocks
+    local unlockList = {
+        {name = "Speed Boost Start (+50)", unlocked = unlocks.speedBoostStart},
+        {name = "Invincibility Start (3s)", unlocked = unlocks.invincibilityStart},
+        {name = "Extra Inventory Slot (4)", unlocked = unlocks.extraInventorySlot},
+        {name = "Ghost Slow Start", unlocked = unlocks.ghostSlowStart},
+        {name = "Map Reveal (+3 vision)", unlocked = unlocks.mapReveal},
+        {name = "Combat Master (2x damage)", unlocked = unlocks.combatMaster},
+        {name = "Speed Runner (+100)", unlocked = unlocks.speedRunner},
+        {name = "Survivor (extra life)", unlocked = unlocks.survivor},
+    }
+    
+    for _, unlock in ipairs(unlockList) do
+        if unlock.unlocked then
+            love.graphics.setColor(0, 1, 0, 1)
+            love.graphics.print("✓ " .. unlock.name, 70, unlockY)
+        else
+            love.graphics.setColor(0.4, 0.4, 0.4, 1)
+            love.graphics.print("✗ " .. unlock.name, 70, unlockY)
+        end
+        unlockY = unlockY + 20
+    end
+    
+    -- Unlock requirements
+    love.graphics.setColor(1, 1, 0.7, 1)
+    love.graphics.print("Unlock Requirements:", 320, 270)
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    
+    local reqs = Progression.getUnlockRequirements()
+    local reqY = 295
+    for _, req in ipairs(reqs) do
+        love.graphics.print(req, 340, reqY)
+        reqY = reqY + 20
+    end
+    
+    -- Instructions
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
+    love.graphics.print("Press ESC to return to title screen", (love.graphics.getWidth() - fonts.small:getWidth("Press ESC to return to title screen"))/2, 550)
+end
     love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
 end
 
@@ -76,6 +148,14 @@ function UI.drawLoseScreen(world, stats, fonts)
     love.graphics.print(statsText, (love.graphics.getWidth() - fonts.small:getWidth(statsText))/2, 260)
     love.graphics.print("Difficulty: " .. CONFIG.DIFFICULTY, (love.graphics.getWidth() - fonts.small:getWidth("Difficulty: " .. CONFIG.DIFFICULTY))/2, 290)
     
+    -- Progression stats
+    local Progression = require("modules/progression")
+    love.graphics.setColor(0.7, 0.7, 1, 1)
+    local progText = string.format("Total: %d runs | %d wins | %d deaths", 
+        Progression.data.totalRuns, Progression.data.totalWins, Progression.data.totalDeaths)
+    love.graphics.print(progText, (love.graphics.getWidth() - fonts.small:getWidth(progText))/2, 330)
+    
+    love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.setFont(fonts.small)
     love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
 end
@@ -112,6 +192,25 @@ function UI.drawWinScreen(world, stats, fonts, dailyChallengeEnabled)
     love.graphics.setFont(fonts.large)
     love.graphics.setColor(1, 1, 0, 1)
     love.graphics.print("Grade: " .. grade, (love.graphics.getWidth() - fonts.large:getWidth("Grade: " .. grade))/2, 340)
+    
+    -- Progression stats and unlocks
+    local Progression = require("modules/progression")
+    love.graphics.setFont(fonts.small)
+    love.graphics.setColor(0.7, 0.7, 1, 1)
+    local progText = string.format("Total: %d runs | %d wins | Best: %ds", 
+        Progression.data.totalRuns, Progression.data.totalWins, 
+        Progression.data.fastestTime < math.huge and math.floor(Progression.data.fastestTime) or 0)
+    love.graphics.print(progText, (love.graphics.getWidth() - fonts.small:getWidth(progText))/2, 400)
+    
+    -- Show new unlocks if any
+    local newUnlocks = Progression.checkUnlocks()
+    if #newUnlocks > 0 then
+        love.graphics.setColor(0, 1, 0, 1)
+        love.graphics.print("NEW UNLOCKS!", (love.graphics.getWidth() - fonts.small:getWidth("NEW UNLOCKS!"))/2, 430)
+        for i, unlock in ipairs(newUnlocks) do
+            love.graphics.print("- " .. unlock, 150, 450 + (i-1)*20)
+        end
+    end
     
     love.graphics.setColor(0.5, 0.5, 0.5, 1)
     love.graphics.setFont(fonts.small)

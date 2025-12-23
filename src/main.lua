@@ -15,6 +15,7 @@ local ProcGen = require("modules/procgen")
 local Accessibility = require("modules/accessibility")
 local Hazards = require("modules/hazards")
 local Events = require("modules/events")
+local Progression = require("modules/progression")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -1378,6 +1379,9 @@ function love.load() -- load function that runs once at the beginning
     love.window.setTitle(CONFIG.WINDOW_TITLE)
     love.window.setMode(CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT)
     
+    -- Load progression data
+    Progression.load()
+    
     -- Use procedural generation if enabled, otherwise use room-based system
     if CONFIG.PROCGEN_ENABLED then
         generateProceduralMap()
@@ -1449,6 +1453,9 @@ function love.load() -- load function that runs once at the beginning
     Events.on(Events.GAME_EVENTS.ITEM_COLLECTED, function(itemType)
         print("[Event] Item collected:", itemType)
     end)
+    
+    -- Apply progression unlocks
+    Progression.applyStartingUnlocks(world, Effects.activeEffects)
     
     debugMode = CONFIG.DEBUG_MODE
     godMode = CONFIG.GOD_MODE
@@ -1560,6 +1567,16 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
         else
             tPressed = false
         end
+        
+        -- View progression screen
+        if love.keyboard.isDown("p") then
+            if not pPressedTitle then
+                currentMode = "progressionScreen"
+                pPressedTitle = true
+            end
+        else
+            pPressedTitle = false
+        end
 
         if love.keyboard.isDown("return") then
             -- Apply difficulty settings
@@ -1615,6 +1632,13 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             if stats.finishTime == 0 then
                 stats.finishTime = love.timer.getTime()
             end
+            
+            -- Record progression (loss)
+            local timeTaken = stats.finishTime - stats.startTime
+            local roomCount = 0
+            for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
+            Progression.recordRun(false, stats.deaths, stats.keysCollected, 0, stats.itemsUsed, timeTaken)
+            
             -- love.event.quit()
             currentMode = "loseScreen"
         end
@@ -1632,6 +1656,22 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             if stats.finishTime == 0 then
                 stats.finishTime = love.timer.getTime()
             end
+            
+            -- Record progression (win)
+            local timeTaken = stats.finishTime - stats.startTime
+            local roomCount = 0
+            for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
+            Progression.recordRun(true, stats.deaths, stats.keysCollected, 0, stats.itemsUsed, timeTaken)
+            
+            -- Check for new unlocks
+            local newUnlocks = Progression.checkUnlocks()
+            if #newUnlocks > 0 then
+                print("[Progression] NEW UNLOCKS:")
+                for _, unlock in ipairs(newUnlocks) do
+                    print("  - " .. unlock)
+                end
+            end
+            
             -- love.event.quit()
             currentMode = "winScreen"
         end 
@@ -2196,6 +2236,17 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             pPressed = false
             escPressed = false
         end
+    
+    elseif currentMode == "progressionScreen" then
+        -- Return to title screen
+        if love.keyboard.isDown("escape") then
+            if not escPressed then
+                currentMode = "titleScreen"
+                escPressed = true
+            end
+        else
+            escPressed = false
+        end
 
     end
     
@@ -2212,6 +2263,8 @@ function love.draw() -- draw function that runs once every frame
 
     if currentMode == "titleScreen" then
         UI.drawTitleScreen(difficultyMenuSelection, {large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25}, dailyChallengeEnabled, timeAttackEnabled)
+    elseif currentMode == "progressionScreen" then
+        UI.drawProgressionScreen({large = AmaticFont80, medium = AmaticFont40, small = AmaticFont25})
     elseif currentMode == "gameScreen" then -- draw game
 
         playerCoord = world.player.coord
