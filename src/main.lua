@@ -17,6 +17,7 @@ local Hazards = require("modules/hazards")
 local Events = require("modules/events")
 local Progression = require("modules/progression")
 local Editor = require("modules/editor")
+local Replay = require("modules/replay")
 
 local currentMode = "titleScreen"
 local difficultyMenuSelection = 2 -- 1=easy, 2=normal, 3=hard, 4=nightmare
@@ -1461,6 +1462,9 @@ function love.load() -- load function that runs once at the beginning
     -- Initialize editor
     Editor.init()
     
+    -- Initialize replay system
+    Replay.init()
+    
     debugMode = CONFIG.DEBUG_MODE
     godMode = CONFIG.GOD_MODE
 
@@ -1528,6 +1532,9 @@ end
 function love.update(dt) -- update function that runs once every frame; dt is change in time and can be used for different tasks
 
     local updateStartTime = love.timer.getTime()
+
+    -- Update replay system
+    Replay.update(dt)
 
     -- Level Editor mode takes priority
     if Editor.isActive() then
@@ -1613,6 +1620,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 print("Random seed: " .. currentSeed)
             end
             
+            -- Start replay recording
+            Replay.startRecording(currentSeed, selectedDifficulty)
+            
             currentMode = "gameScreen"
         elseif love.keyboard.isDown("escape") then
             love.event.quit()
@@ -1649,6 +1659,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
             Progression.recordRun(false, stats.deaths, stats.keysCollected, 0, stats.itemsUsed, timeTaken)
             
+            -- Stop replay recording
+            Replay.stopRecording()
+            
             -- love.event.quit()
             currentMode = "loseScreen"
         end
@@ -1672,6 +1685,9 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
             local roomCount = 0
             for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
             Progression.recordRun(true, stats.deaths, stats.keysCollected, 0, stats.itemsUsed, timeTaken)
+            
+            -- Stop replay recording
+            Replay.stopRecording()
             
             -- Check for new unlocks
             local newUnlocks = Progression.checkUnlocks()
@@ -2666,6 +2682,11 @@ end
 
 -- Keyboard input handler
 function love.keypressed(key)
+    -- Record input if replay is recording
+    if Replay.isRecording() and currentMode == "gameScreen" then
+        Replay.recordInput("keypress", key, love.timer.getTime() - stats.startTime)
+    end
+    
     -- Toggle editor mode
     if key == "f5" then
         Editor.toggle()
@@ -2675,6 +2696,35 @@ function love.keypressed(key)
     -- Pass keypresses to editor when active
     if Editor.isActive() then
         Editor.keypressed(key)
+        return
+    end
+    
+    -- Replay controls
+    if key == "f6" and currentMode == "titleScreen" then
+        -- Save replay from last game
+        if Replay.getMetadata().totalInputs > 0 then
+            Replay.save()
+            print("[Replay] Saved replay from previous game")
+        end
+    elseif key == "f7" and currentMode == "titleScreen" then
+        -- List and load most recent replay
+        local replays = Replay.listReplays()
+        if #replays > 0 then
+            -- Sort by modification time (most recent first)
+            table.sort(replays, function(a, b) 
+                local infoA = love.filesystem.getInfo("replays/" .. a)
+                local infoB = love.filesystem.getInfo("replays/" .. b)
+                return infoA.modtime > infoB.modtime
+            end)
+            
+            if Replay.load(replays[1]) then
+                print("[Replay] Loaded:", replays[1])
+                -- Note: Actual playback requires game restart with loaded seed
+                -- For now, just load the replay data
+            end
+        else
+            print("[Replay] No replays found")
+        end
     end
 end
 

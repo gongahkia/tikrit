@@ -54,6 +54,7 @@ function UI.drawTitleScreen(difficultyMenuSelection, fonts, dailyChallengeEnable
     love.graphics.print("Use UP/DOWN arrows to select, ENTER to start", (love.graphics.getWidth() - fonts.small:getWidth("Use UP/DOWN arrows to select, ENTER to start"))/2, 460)
     love.graphics.print("Press D to toggle Daily Challenge | T to toggle Time Attack", (love.graphics.getWidth() - fonts.small:getWidth("Press D to toggle Daily Challenge | T to toggle Time Attack"))/2, 485)
     love.graphics.print("Press P to view Progression & Unlocks", (love.graphics.getWidth() - fonts.small:getWidth("Press P to view Progression & Unlocks"))/2, 510)
+    love.graphics.print("Press F5 for Level Editor | F6 to Save Replay | F7 to Load Replay", (love.graphics.getWidth() - fonts.small:getWidth("Press F5 for Level Editor | F6 to Save Replay | F7 to Load Replay"))/2, 535)
     love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
 end
 
