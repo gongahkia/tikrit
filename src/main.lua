@@ -1416,31 +1416,8 @@ function love.load() -- load function that runs once at the beginning
     -- Load progression data
     Progression.load()
     
-    -- Use procedural generation if enabled, otherwise use room-based system
-    if CONFIG.PROCGEN_ENABLED then
-        generateProceduralMap()
-        worldMap = {}  -- Empty world map for procgen
-        world.player.currRoom = "procgen"
-        -- Generate floor/wall sprite maps for procgen
-        randomFloorMap = generateProcgenFloorMap()
-        randomWallMap = generateProcgenWallMap()
-        doorList = {}
-        openedDoorSpriteCoords = {}
-    else
-        randomiseMap("map/layout.txt")
-        worldMap = generateMap("map/layout.txt")
-        world.key.globalCount = totalKeys(worldMap)
-        playerRoomCoord = validStartingRoomAndCoord(worldMap)
-        randomFloorMap = randomFloor(worldMap)
-        randomWallMap = randomWall(worldMap)
-        world.player.currRoom = playerRoomCoord[1]
-        world.player.coord = playerRoomCoord[2]
-        deserialize(string.format("map/%s.txt", playerRoomCoord[1]))
-        doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
-        openedDoorSpriteCoords = shallowCopy(doorList)
-        addDoorAsWall(world,doorList)
-        world.door.coord = doorList
-    end
+    -- Don't generate map yet - wait until game starts with proper seed
+    -- Map will be generated after difficulty selection and seed setting
     
     -- Initialize ghost AI
     AI.initializeGhosts(world)
@@ -1684,6 +1661,32 @@ function love.update(dt) -- update function that runs once every frame; dt is ch
                 print("Daily Challenge Mode - Seed: " .. currentSeed .. " (" .. Utils.getDailyDateString() .. ")")
             else
                 print("Random seed: " .. currentSeed)
+            end
+            
+            -- NOW generate the map with the proper seed
+            if CONFIG.PROCGEN_ENABLED then
+                generateProceduralMap()
+                worldMap = {}  -- Empty world map for procgen
+                world.player.currRoom = "procgen"
+                -- Generate floor/wall sprite maps for procgen
+                randomFloorMap = generateProcgenFloorMap()
+                randomWallMap = generateProcgenWallMap()
+                doorList = {}
+                openedDoorSpriteCoords = {}
+            else
+                randomiseMap("map/layout.txt")
+                worldMap = generateMap("map/layout.txt")
+                world.key.globalCount = totalKeys(worldMap)
+                playerRoomCoord = validStartingRoomAndCoord(worldMap)
+                randomFloorMap = randomFloor(worldMap)
+                randomWallMap = randomWall(worldMap)
+                world.player.currRoom = playerRoomCoord[1]
+                world.player.coord = playerRoomCoord[2]
+                deserialize(string.format("map/%s.txt", playerRoomCoord[1]))
+                doorList = extractDoors(worldMap, world.player.currRoom) -- checks connecting doors available and replace doors that should not exist with walls
+                openedDoorSpriteCoords = shallowCopy(doorList)
+                addDoorAsWall(world,doorList)
+                world.door.coord = doorList
             end
             
             -- Start replay recording
