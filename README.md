@@ -61,9 +61,21 @@ Tiny horror-ish [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in 
 $ git clone https://github.com/gongahkia/tikrit
 $ chmod +x install.sh
 $ ./install.sh
-$ make # builds executable
-$ make reset # rebuild randomised level
+$ make build # run game
+$ make reset # reset maps to fresh state
 ```
+
+### Building Distribution Packages
+
+```console
+$ ./build.sh  # Interactive build script
+# OR
+$ make love-file  # Create .love file
+$ make macos      # Create macOS .app bundle
+$ make release    # Build all platforms
+```
+
+See [DISTRIBUTION.md](DISTRIBUTION.md) for detailed build instructions.
 
 ### GUI
 
