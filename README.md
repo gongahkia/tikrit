@@ -8,7 +8,8 @@ Tiny survival-horror [roguelike](https://en.wikipedia.org/wiki/Roguelike) writte
 ## Usage
 
 ```console
-$ git clone https://github.com/gongahkia/tikrit
+$ git clone https://github.com/gongahkia/tikrit && cd tikrit 
+$ chmod +x install.sh build.sh
 $ ./install.sh
 $ ./build.sh
 $ make
