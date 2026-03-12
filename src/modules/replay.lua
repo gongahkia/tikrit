@@ -14,6 +14,7 @@ local function newReplayData(seed, difficulty)
         version = FILE_VERSION,
         seed = seed,
         difficulty = difficulty or "normal",
+        context = {},
         inputs = {},
         metadata = {
             recordingDate = os.date("%Y-%m-%d %H:%M:%S"),
@@ -24,6 +25,18 @@ local function newReplayData(seed, difficulty)
 end
 
 local replayData = newReplayData(nil, nil)
+
+local function deepCopy(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for key, innerValue in pairs(value) do
+        copy[deepCopy(key)] = deepCopy(innerValue)
+    end
+    return copy
+end
 
 local function getFilesystem()
     if love and love.filesystem then
@@ -107,8 +120,22 @@ local function serializeReplayData(data)
         "DATE:" .. tostring(data.metadata.recordingDate or ""),
         "DURATION:" .. tostring(data.metadata.duration or 0),
         "TOTAL_INPUTS:" .. tostring(data.metadata.totalInputs or #data.inputs),
-        "INPUTS:",
     }
+
+    local function flattenContext(prefix, value)
+        if type(value) ~= "table" then
+            table.insert(lines, string.format("CONTEXT:%s=%s", prefix, tostring(value)))
+            return
+        end
+
+        for key, innerValue in pairs(value) do
+            local nextPrefix = prefix ~= "" and (prefix .. "." .. key) or key
+            flattenContext(nextPrefix, innerValue)
+        end
+    end
+
+    flattenContext("", data.context or {})
+    table.insert(lines, "INPUTS:")
 
     for _, input in ipairs(data.inputs or {}) do
         table.insert(lines, string.format("%s|%s|%.4f", input.type, input.key, input.timestamp))
@@ -125,6 +152,36 @@ local function deserializeReplayData(data)
     local replay = newReplayData(nil, "normal")
     replay.metadata.recordingDate = ""
     local parsingInputs = false
+
+    local function coerce(value)
+        if value == "true" then
+            return true
+        elseif value == "false" then
+            return false
+        end
+
+        return tonumber(value) or value
+    end
+
+    local function assignContext(path, value)
+        local current = replay.context
+        local parts = {}
+        for part in path:gmatch("[^%.]+") do
+            table.insert(parts, part)
+        end
+
+        for index = 1, #parts - 1 do
+            local part = parts[index]
+            if type(current[part]) ~= "table" then
+                current[part] = {}
+            end
+            current = current[part]
+        end
+
+        if #parts > 0 then
+            current[parts[#parts]] = coerce(value)
+        end
+    end
 
     for line in data:gmatch("[^\r\n]+") do
         if line == "INPUTS:" then
@@ -153,6 +210,11 @@ local function deserializeReplayData(data)
                     replay.metadata.duration = tonumber(value) or 0
                 elseif key == "TOTAL_INPUTS" then
                     replay.metadata.totalInputs = tonumber(value) or 0
+                elseif key == "CONTEXT" then
+                    local path, rawValue = value:match("^([%w%.]+)=(.+)$")
+                    if path and rawValue then
+                        assignContext(path, rawValue)
+                    end
                 end
             end
         end
@@ -173,8 +235,9 @@ function Replay.init()
     replayData = newReplayData(nil, nil)
 end
 
-function Replay.startRecording(seed, difficulty)
+function Replay.startRecording(seed, difficulty, context)
     replayData = newReplayData(seed, difficulty)
+    replayData.context = deepCopy(context or {})
     recording = true
     playing = false
     playbackIndex = 1
@@ -304,6 +367,10 @@ end
 
 function Replay.getMetadata()
     return replayData.metadata
+end
+
+function Replay.getContext()
+    return replayData.context
 end
 
 function Replay.getPlaybackProgress()
