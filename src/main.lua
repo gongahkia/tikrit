@@ -8,6 +8,7 @@ local Animation = require("modules/animation")
 local Audio = require("modules/audio")
 local Combat = require("modules/combat")
 local ProcGen = require("modules/procgen")
+local Hazards = require("modules/hazards")
 local Accessibility = require("modules/accessibility")
 local Events = require("modules/events")
 local Progression = require("modules/progression")
@@ -27,6 +28,7 @@ local game = {
     pauseOptions = {
         {label = "Resume"},
         {label = "Settings"},
+        {label = "Save Replay"},
         {label = "Restart"},
         {label = "Quit to Title"},
     },
@@ -36,9 +38,16 @@ local game = {
         optionIndex = 1,
         options = {},
     },
+    replayScreen = {
+        index = 1,
+        entries = {},
+    },
     debugToolsEnabled = false,
     settings = nil,
     run = nil,
+    input = {
+        heldKeys = {},
+    },
 }
 
 local sprites = {}
@@ -100,6 +109,7 @@ local function buildTitleItems()
         {label = "Time Attack", value = formatBool(game.settings.gameplay.timeAttack)},
         {label = "Settings"},
         {label = "Progression"},
+        {label = "Replays"},
         {label = "Quit"},
     }
 end
@@ -220,6 +230,7 @@ local function createRuntimeWorld(generated, difficultyName)
         shrines = Utils.deepCopy(generated.shrines),
         safeZones = Utils.deepCopy(generated.safeZones),
         darkZones = Utils.deepCopy(generated.darkZones),
+        hazards = Utils.deepCopy(generated.hazards),
         monsters = monsters,
         player = player,
     }
@@ -251,6 +262,78 @@ local function registerRunEvents()
     Events.on(Events.GAME_EVENTS.PLAYER_DEATH, function()
         setRunMessage("The halls finally caught up.")
     end)
+end
+
+local function buildReplayContext(run)
+    return {
+        fogEnabled = run.runtime.fogEnabled,
+        timeAttackEnabled = run.runtime.timeAttack.enabled,
+        player = {
+            baseSpeed = run.world.player.baseSpeed,
+            speedBonus = run.world.player.speedBonus,
+            inventorySize = run.world.player.inventorySize,
+            attackDamage = run.world.player.attackDamage,
+            visionBonus = run.world.player.visionBonus,
+            extraLife = run.world.player.extraLife,
+            wardCharges = run.world.player.wardCharges,
+        },
+        effects = {
+            invincibility = Effects.activeEffects.invincibility,
+            invincibilityTimer = Effects.activeEffects.invincibilityTimer,
+            ghostSlow = Effects.activeEffects.ghostSlow,
+            ghostSlowTimer = Effects.activeEffects.ghostSlowTimer,
+        },
+    }
+end
+
+local function refreshReplayEntries()
+    local entries = {}
+    for _, file in ipairs(Replay.listReplays()) do
+        local replay = Replay.inspect(file)
+        if replay then
+            local details = string.format(
+                "%s | %s | %.1fs",
+                replay.metadata.recordingDate ~= "" and replay.metadata.recordingDate or "Unknown date",
+                replay.difficulty or "normal",
+                replay.metadata.duration or 0
+            )
+            table.insert(entries, {
+                file = file,
+                details = details,
+                metadata = replay.metadata,
+            })
+        end
+    end
+
+    game.replayScreen.entries = entries
+    if game.replayScreen.index > #entries then
+        game.replayScreen.index = #entries
+    end
+    if game.replayScreen.index < 1 then
+        game.replayScreen.index = 1
+    end
+end
+
+local function saveReplaySnapshot()
+    if game.run and game.run.replayMode then
+        setRunMessage("Playback runs cannot be re-saved.")
+        return false
+    end
+
+    if not Replay.hasData() then
+        setRunMessage("No replay data to save yet.")
+        return false
+    end
+
+    local success = Replay.save()
+    if success then
+        refreshReplayEntries()
+        setRunMessage("Replay saved.")
+        return true
+    end
+
+    setRunMessage("Replay save failed.")
+    return false
 end
 
 local function computeVisionRadius()
@@ -307,16 +390,35 @@ local function hasSeenTile(gridX, gridY)
     return run.runtime.seenTiles[gridX .. ":" .. gridY] == true
 end
 
-local function startNewRun()
+local function startNewRun(options)
+    options = options or {}
     if Replay.isRecording() then
         Replay.stopRecording()
+    end
+    if Replay.isPlaying() then
+        Replay.stopPlayback()
     end
     love.audio.stop(sounds.walking)
     love.audio.stop(sounds.ghost)
 
-    local difficulty = game.selectedDifficulty
-    local seed = Utils.setGameSeed(game.settings.gameplay.dailyChallenge)
+    local difficulty = options.difficulty or game.selectedDifficulty
+    local seed = Utils.setGameSeed(
+        options.useDailyChallenge ~= nil and options.useDailyChallenge or game.settings.gameplay.dailyChallenge,
+        options.seed
+    )
     local generated = ProcGen.generateRunData(difficulty)
+    local fogEnabled = options.fogEnabled
+    if fogEnabled == nil then
+        fogEnabled = game.settings.gameplay.fog
+    end
+    if CONFIG.DIFFICULTY_SETTINGS[difficulty].forcedFog then
+        fogEnabled = true
+    end
+
+    local timeAttackEnabled = options.timeAttackEnabled
+    if timeAttackEnabled == nil then
+        timeAttackEnabled = game.settings.gameplay.timeAttack
+    end
 
     Effects.resetRun()
     Combat.init()
@@ -327,7 +429,7 @@ local function startNewRun()
         difficultyName = difficulty,
         world = createRuntimeWorld(generated, difficulty),
         runtime = {
-            fogEnabled = game.settings.gameplay.fog or CONFIG.DIFFICULTY_SETTINGS[difficulty].forcedFog,
+            fogEnabled = fogEnabled,
             minimapEnabled = game.settings.gameplay.minimap,
             currentVisibleTiles = {},
             seenTiles = {},
@@ -336,7 +438,7 @@ local function startNewRun()
             sanityEffects = Sanity.getEffects({sanity = CONFIG.SANITY_MAX, panicActive = false}),
             sanityStatus = nil,
             timeAttack = {
-                enabled = game.settings.gameplay.timeAttack,
+                enabled = timeAttackEnabled,
                 startTime = love.timer.getTime(),
                 elapsed = 0,
                 lastIncrease = 0,
@@ -353,13 +455,33 @@ local function startNewRun()
             deaths = 0,
         },
         finished = false,
+        replayMode = options.replayMode or false,
+        replayProgress = 0,
     }
 
     game.run = run
-    Progression.applyStartingUnlocks(run)
+    if not run.replayMode then
+        Progression.applyStartingUnlocks(run)
+    end
+    if options.playerContext then
+        for key, value in pairs(options.playerContext) do
+            run.world.player[key] = value
+        end
+    end
+    if options.effectContext then
+        for key, value in pairs(options.effectContext) do
+            Effects.activeEffects[key] = value
+        end
+    end
     registerRunEvents()
     Animation.initGhostBobbing(#run.world.monsters)
-    Replay.startRecording(seed, difficulty)
+    game.input.heldKeys = {}
+    if run.replayMode then
+        run.runtime.message = "Replay playback"
+        run.runtime.messageTimer = 2.2
+    else
+        Replay.startRecording(seed, difficulty, buildReplayContext(run))
+    end
     updateVisibility()
     game.screen = "game"
 end
@@ -368,11 +490,16 @@ local function returnToTitle()
     if Replay.isRecording() then
         Replay.stopRecording()
     end
+    if Replay.isPlaying() then
+        Replay.stopPlayback()
+    end
     love.audio.stop(sounds.walking)
     love.audio.stop(sounds.ghost)
     game.run = nil
+    game.input.heldKeys = {}
     game.screen = "title"
     game.pauseIndex = 1
+    refreshReplayEntries()
 end
 
 local function finalizeRun(won)
@@ -384,16 +511,19 @@ local function finalizeRun(won)
     run.finished = true
     run.stats.finishTime = love.timer.getTime()
     Replay.stopRecording()
+    Replay.stopPlayback()
     love.audio.stop(sounds.walking)
     love.audio.stop(sounds.ghost)
-    Progression.recordRun({
-        won = won,
-        deaths = run.stats.deaths,
-        keysCollected = run.stats.keysCollected,
-        monstersKilled = run.stats.monstersKilled,
-        itemsCollected = run.stats.itemsCollected,
-        timeTaken = run.stats.finishTime - run.stats.startTime,
-    })
+    if not run.replayMode then
+        Progression.recordRun({
+            won = won,
+            deaths = run.stats.deaths,
+            keysCollected = run.stats.keysCollected,
+            monstersKilled = run.stats.monstersKilled,
+            itemsCollected = run.stats.itemsCollected,
+            timeTaken = run.stats.finishTime - run.stats.startTime,
+        })
+    end
     game.screen = won and "win" or "lose"
 end
 
@@ -486,6 +616,20 @@ local function rectanglesOverlap(a, b)
         and a[2] < b[2] + CONFIG.TILE_SIZE
 end
 
+local function isMovementKeyDown(...)
+    if Replay.isPlaying() then
+        for index = 1, select("#", ...) do
+            local key = select(index, ...)
+            if game.input.heldKeys[key] then
+                return true
+            end
+        end
+        return false
+    end
+
+    return love.keyboard.isDown(...)
+end
+
 local function movePlayer(dt)
     local run = game.run
     local player = run.world.player
@@ -497,16 +641,16 @@ local function movePlayer(dt)
 
     local dx = 0
     local dy = 0
-    if love.keyboard.isDown("w") or love.keyboard.isDown("up") then
+    if isMovementKeyDown("w", "up") then
         dy = dy - 1
     end
-    if love.keyboard.isDown("s") or love.keyboard.isDown("down") then
+    if isMovementKeyDown("s", "down") then
         dy = dy + 1
     end
-    if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
+    if isMovementKeyDown("a", "left") then
         dx = dx - 1
     end
-    if love.keyboard.isDown("d") or love.keyboard.isDown("right") then
+    if isMovementKeyDown("d", "right") then
         dx = dx + 1
     end
 
@@ -600,6 +744,29 @@ local function processPickups()
     end
 end
 
+local function handleGameplayActionKey(key)
+    if key == "space" then
+        Combat.tryAttack(game.run.world.player.lastMoveX, game.run.world.player.lastMoveY)
+    elseif key == "1" then
+        useInventorySlot(1)
+    elseif key == "2" then
+        useInventorySlot(2)
+    elseif key == "3" then
+        useInventorySlot(3)
+    elseif key == "4" then
+        useInventorySlot(4)
+    end
+end
+
+local function applyReplayInput(input)
+    if input.type == "keydown" then
+        game.input.heldKeys[input.key] = true
+        handleGameplayActionKey(input.key)
+    elseif input.type == "keyup" then
+        game.input.heldKeys[input.key] = nil
+    end
+end
+
 local function updateGame(dt)
     local run = game.run
     if not run then
@@ -607,6 +774,14 @@ local function updateGame(dt)
     end
 
     Replay.update(dt)
+    while Replay.isPlaying() do
+        local replayInput = Replay.getNextInput()
+        if not replayInput then
+            break
+        end
+        applyReplayInput(replayInput)
+    end
+    run.replayProgress = Replay.getPlaybackProgress()
     if run.runtime.messageTimer > 0 then
         run.runtime.messageTimer = run.runtime.messageTimer - dt
         if run.runtime.messageTimer <= 0 then
@@ -624,9 +799,6 @@ local function updateGame(dt)
     Effects.updateParticles(dt)
     Effects.updateScreenShake(dt)
 
-    run.runtime.sanityStatus = Sanity.update(run.world.player, run.world, {fogEnabled = run.runtime.fogEnabled}, dt)
-    run.runtime.sanityEffects = run.runtime.sanityStatus.effects
-
     if run.runtime.timeAttack.enabled then
         run.runtime.timeAttack.elapsed = love.timer.getTime() - run.runtime.timeAttack.startTime
         if run.runtime.timeAttack.elapsed - run.runtime.timeAttack.lastIncrease >= CONFIG.TIME_ATTACK_SPEED_INCREASE_INTERVAL then
@@ -638,9 +810,29 @@ local function updateGame(dt)
     end
 
     movePlayer(dt)
-    AI.updateMonsters(run.world.monsters, run.world.player, run.world, {sanityEffects = run.runtime.sanityEffects}, dt)
+    local aiSummary = AI.updateMonsters(run.world.monsters, run.world.player, run.world, {sanityEffects = run.runtime.sanityEffects}, dt)
+    if aiSummary.newDetections > 0 then
+        Sanity.applyShock(run.world.player, CONFIG.SANITY_DETECTION_SPIKE * aiSummary.newDetections)
+        setRunMessage("Something found you.")
+    end
+
+    local hazardResult = Hazards.update(run.world.hazards, run.world.player, dt)
+    if hazardResult.cursedTriggered then
+        Sanity.applyShock(run.world.player, hazardResult.sanityShock)
+        setRunMessage("A cursed room tears at your sanity.")
+    end
+    if hazardResult.spikeTriggered then
+        setRunMessage("A trap snaps shut.")
+    end
+
     processCombat()
+    if hazardResult.playerKilled then
+        killPlayer()
+    end
     processPickups()
+
+    run.runtime.sanityStatus = Sanity.update(run.world.player, run.world, {fogEnabled = run.runtime.fogEnabled}, dt)
+    run.runtime.sanityEffects = run.runtime.sanityStatus.effects
 
     updateVisibility()
     Audio.updateGhostAudio(game.settings, sounds.ghost, run.world.player.coord, run.world.monsters, run.runtime.sanityEffects)
@@ -696,6 +888,8 @@ local function drawWorld()
         Accessibility.setColor(game.settings, 0.18, 0.32, 0.18, 0.1)
         love.graphics.rectangle("fill", zone.x, zone.y, zone.width, zone.height)
     end
+
+    Hazards.draw(world.hazards, game.settings, isVisibleTile)
 
     for _, shrine in ipairs(world.shrines) do
         Accessibility.setColor(game.settings, 0.5, 0.95, 0.7, 0.9)
@@ -817,6 +1011,7 @@ function love.load()
     Effects.init()
     Editor.init()
     Replay.init()
+    refreshReplayEntries()
 end
 
 function love.update(dt)
@@ -845,6 +1040,8 @@ function love.draw()
         UI.drawSettingsScreen(game.settingsScreen, fonts, game.settings)
     elseif game.screen == "progression" then
         UI.drawProgressionScreen(Progression.data, fonts, game.settings)
+    elseif game.screen == "replays" then
+        UI.drawReplayScreen(game.replayScreen, fonts, game.settings)
     elseif game.screen == "game" then
         drawWorld()
     elseif game.screen == "pause" then
@@ -893,9 +1090,48 @@ local function openSettings(previousScreen)
     refreshSettingsOptions()
 end
 
+local function openReplayScreen()
+    refreshReplayEntries()
+    game.screen = "replays"
+end
+
+local function startReplayFromSelection()
+    local entry = game.replayScreen.entries[game.replayScreen.index]
+    if not entry then
+        return false
+    end
+
+    if not Replay.load(entry.file) then
+        return false
+    end
+
+    local replay = Replay.inspect(entry.file)
+    if not replay then
+        return false
+    end
+
+    local context = replay.context or {}
+
+    startNewRun({
+        difficulty = replay.difficulty or game.selectedDifficulty,
+        seed = replay.seed,
+        useDailyChallenge = false,
+        replayMode = true,
+        fogEnabled = context.fogEnabled,
+        timeAttackEnabled = context.timeAttackEnabled,
+        playerContext = context.player,
+        effectContext = context.effects,
+    })
+    local ok = Replay.startPlayback()
+    if not ok then
+        return false
+    end
+    return true
+end
+
 function love.keypressed(key)
     if Replay.isRecording() and game.screen == "game" then
-        Replay.recordInput("keypress", key, love.timer.getTime() - game.run.stats.startTime)
+        Replay.recordKeyState(key, true, love.timer.getTime() - game.run.stats.startTime)
     end
 
     if Editor.isActive() then
@@ -913,6 +1149,13 @@ function love.keypressed(key)
         return
     end
 
+    if Replay.isPlaying() and game.screen == "game" then
+        if key == "escape" then
+            returnToTitle()
+        end
+        return
+    end
+
     if game.screen == "title" then
         if key == "up" then
             game.titleIndex = math.max(1, game.titleIndex - 1)
@@ -922,8 +1165,6 @@ function love.keypressed(key)
             adjustTitleValue(-1)
         elseif key == "right" then
             adjustTitleValue(1)
-        elseif key == "f6" then
-            Replay.save()
         elseif key == "return" then
             if game.titleIndex == 1 then
                 startNewRun()
@@ -937,10 +1178,29 @@ function love.keypressed(key)
                 game.previousScreen = "title"
                 game.screen = "progression"
             elseif game.titleIndex == 7 then
+                openReplayScreen()
+            elseif game.titleIndex == 8 then
                 love.event.quit()
             end
         elseif key == "escape" then
             love.event.quit()
+        end
+        return
+    end
+
+    if game.screen == "replays" then
+        if key == "up" then
+            game.replayScreen.index = math.max(1, game.replayScreen.index - 1)
+        elseif key == "down" then
+            game.replayScreen.index = math.min(#game.replayScreen.entries, game.replayScreen.index + 1)
+        elseif key == "r" then
+            refreshReplayEntries()
+        elseif key == "return" then
+            if startReplayFromSelection() then
+                return
+            end
+        elseif key == "escape" then
+            game.screen = "title"
         end
         return
     end
@@ -979,16 +1239,8 @@ function love.keypressed(key)
             love.audio.stop(sounds.walking)
             game.screen = "pause"
             return
-        elseif key == "space" then
-            Combat.tryAttack(game.run.world.player.lastMoveX, game.run.world.player.lastMoveY)
-        elseif key == "1" then
-            useInventorySlot(1)
-        elseif key == "2" then
-            useInventorySlot(2)
-        elseif key == "3" then
-            useInventorySlot(3)
-        elseif key == "4" then
-            useInventorySlot(4)
+        else
+            handleGameplayActionKey(key)
         end
         return
     end
@@ -1004,8 +1256,10 @@ function love.keypressed(key)
             elseif game.pauseIndex == 2 then
                 openSettings("pause")
             elseif game.pauseIndex == 3 then
-                startNewRun()
+                saveReplaySnapshot()
             elseif game.pauseIndex == 4 then
+                startNewRun()
+            elseif game.pauseIndex == 5 then
                 returnToTitle()
             end
         elseif key == "p" or key == "escape" then
@@ -1015,7 +1269,9 @@ function love.keypressed(key)
     end
 
     if game.screen == "win" or game.screen == "lose" then
-        if key == "return" or key == "escape" then
+        if key == "s" and game.run and not game.run.replayMode then
+            saveReplaySnapshot()
+        elseif key == "return" or key == "escape" then
             returnToTitle()
         end
     end
@@ -1024,5 +1280,17 @@ end
 function love.mousereleased(x, y, button)
     if Editor.isActive() then
         Editor.mousereleased(x, y, button)
+    end
+end
+
+function love.keyreleased(key)
+    if Replay.isRecording() and game.screen == "game" then
+        Replay.recordKeyState(key, false, love.timer.getTime() - game.run.stats.startTime)
+    end
+end
+
+function love.wheelmoved(x, y)
+    if Editor.isActive() then
+        Editor.wheelmoved(x, y)
     end
 end
