@@ -19,9 +19,6 @@ $ make test # optionally
 ## Screenshot
 
 ![](./asset/reference/1.png)
-![](./asset/reference/2.png)
-![](./asset/reference/3.png)
-![](./asset/reference/4.png)
 
 ## Assets
 
