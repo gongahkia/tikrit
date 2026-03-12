@@ -1,7 +1,7 @@
 [![](https://img.shields.io/badge/tikrit_1.0-passing-light_green)](https://github.com/gongahkia/tikrit/releases/tag/1.0)
 [![](https://img.shields.io/badge/tikrit_2.0-passing-green)](https://github.com/gongahkia/tikrit/releases/tag/2.0)
 
-# Tikrit
+# `Tikrit`
 
 Tiny survival-horror [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in [Lua](https://www.lua.org/) using [Love2D](https://love2d.org/).
 
@@ -13,10 +13,8 @@ $ chmod +x install.sh build.sh
 $ ./install.sh
 $ ./build.sh
 $ make
-$ make test # optionally
+$ make test
 ```
-
-On macOS, `make` will also use `/Applications/love.app` or `~/Applications/love.app` automatically when the `love` binary is not on `PATH`.
 
 ## Screenshot
 
