@@ -16,8 +16,11 @@ local testFiles = {
     "test/spec/sanity_spec.lua",
     "test/spec/ai_spec.lua",
     "test/spec/procgen_spec.lua",
+    "test/spec/hazards_spec.lua",
     "test/spec/combat_spec.lua",
     "test/spec/progression_spec.lua",
+    "test/spec/replay_spec.lua",
+    "test/spec/runtime_smoke_spec.lua",
 }
 
 os.exit(TestRunner.runAll(testFiles))
