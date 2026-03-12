@@ -1,287 +1,144 @@
--- Replay System Module
--- Records all player inputs with timestamps for deterministic playback
--- Useful for bug reproduction, speedrun verification, and tutorials
-
 local Replay = {}
 
--- Replay state
+local FILE_VERSION = "2.0"
+local REPLAY_DIR = "replays"
+
 local recording = false
 local playing = false
-local replayData = {
-    version = "1.0",
-    seed = nil,
-    difficulty = nil,
-    inputs = {},
-    metadata = {
-        recordingDate = nil,
-        duration = 0,
-        totalInputs = 0
-    }
-}
 local playbackIndex = 1
 local playbackTime = 0
 local currentRecordingTime = 0
 
--- Directory for replay files
-local REPLAY_DIR = "replays"
-
--- Initialize replay system
-function Replay.init()
-    -- Create replays directory if it doesn't exist
-    local info = love.filesystem.getInfo(REPLAY_DIR)
-    if not info then
-        love.filesystem.createDirectory(REPLAY_DIR)
-    end
-    
-    recording = false
-    playing = false
-    playbackIndex = 1
-    playbackTime = 0
-    currentRecordingTime = 0
-    
-    print("[Replay] System initialized")
-end
-
--- Start recording inputs
-function Replay.startRecording(seed, difficulty)
-    replayData = {
-        version = "1.0",
+local function newReplayData(seed, difficulty)
+    return {
+        version = FILE_VERSION,
         seed = seed,
-        difficulty = difficulty,
+        difficulty = difficulty or "normal",
         inputs = {},
         metadata = {
             recordingDate = os.date("%Y-%m-%d %H:%M:%S"),
             duration = 0,
-            totalInputs = 0
-        }
+            totalInputs = 0,
+        },
     }
-    
-    recording = true
-    playing = false
-    currentRecordingTime = 0
-    
-    print("[Replay] Recording started - Seed:", seed, "Difficulty:", difficulty)
 end
 
--- Stop recording
-function Replay.stopRecording()
-    if recording then
-        replayData.metadata.duration = currentRecordingTime
-        replayData.metadata.totalInputs = #replayData.inputs
-        recording = false
-        print("[Replay] Recording stopped - Duration:", currentRecordingTime, "Inputs:", #replayData.inputs)
+local replayData = newReplayData(nil, nil)
+
+local function getFilesystem()
+    if love and love.filesystem then
+        return {
+            createDirectory = function(path)
+                love.filesystem.createDirectory(path)
+            end,
+            getDirectoryItems = function(path)
+                return love.filesystem.getDirectoryItems(path)
+            end,
+            read = function(path)
+                return love.filesystem.read(path)
+            end,
+            write = function(path, contents)
+                return love.filesystem.write(path, contents)
+            end,
+            exists = function(path)
+                return love.filesystem.getInfo(path) ~= nil
+            end,
+        }
     end
+
+    return {
+        createDirectory = function(path)
+            os.execute(string.format('mkdir -p "%s"', path))
+        end,
+        getDirectoryItems = function(path)
+            local items = {}
+            local handle = io.popen(string.format('ls -1 "%s" 2>/dev/null', path))
+            if not handle then
+                return items
+            end
+            for file in handle:lines() do
+                table.insert(items, file)
+            end
+            handle:close()
+            return items
+        end,
+        read = function(path)
+            local handle = io.open(path, "r")
+            if not handle then
+                return nil
+            end
+            local data = handle:read("*all")
+            handle:close()
+            return data
+        end,
+        write = function(path, contents)
+            local handle = io.open(path, "w")
+            if not handle then
+                return false
+            end
+            handle:write(contents)
+            handle:close()
+            return true
+        end,
+        exists = function(path)
+            local handle = io.open(path, "r")
+            if handle then
+                handle:close()
+                return true
+            end
+            return false
+        end,
+    }
 end
 
--- Record an input event
-function Replay.recordInput(inputType, key, timestamp)
-    if not recording then return end
-    
-    table.insert(replayData.inputs, {
-        type = inputType,  -- "keydown", "keyup", "keypress"
-        key = key,
-        timestamp = timestamp or currentRecordingTime
-    })
-end
-
--- Update recording time
-function Replay.update(dt)
-    if recording then
-        currentRecordingTime = currentRecordingTime + dt
-    elseif playing then
-        playbackTime = playbackTime + dt
-    end
-end
-
--- Save replay to file
-function Replay.save(filename)
-    if not replayData or #replayData.inputs == 0 then
-        print("[Replay] No replay data to save")
-        return false
-    end
-    
-    -- Use default filename if none provided
+local function normalizeFilename(filename)
     filename = filename or string.format("replay_%s.txt", os.date("%Y%m%d_%H%M%S"))
-    
-    -- Ensure .txt extension
     if not filename:match("%.txt$") then
         filename = filename .. ".txt"
     end
-    
-    local filepath = REPLAY_DIR .. "/" .. filename
-    
-    -- Serialize replay data
-    local data = serializeReplayData(replayData)
-    
-    -- Save to file
-    local success = love.filesystem.write(filepath, data)
-    
-    if success then
-        print("[Replay] Saved to", filepath)
-        return true
-    else
-        print("[Replay] Failed to save replay")
-        return false
-    end
+    return filename
 end
 
--- Load replay from file
-function Replay.load(filename)
-    -- Ensure .txt extension
-    if not filename:match("%.txt$") then
-        filename = filename .. ".txt"
-    end
-    
-    local filepath = REPLAY_DIR .. "/" .. filename
-    
-    local data = love.filesystem.read(filepath)
-    if not data then
-        print("[Replay] Failed to load replay:", filepath)
-        return false
-    end
-    
-    -- Deserialize replay data
-    replayData = deserializeReplayData(data)
-    
-    if replayData then
-        print("[Replay] Loaded:", filename, "- Inputs:", #replayData.inputs, "Duration:", replayData.metadata.duration)
-        return true
-    else
-        print("[Replay] Failed to parse replay data")
-        return false
-    end
-end
+local function serializeReplayData(data)
+    local lines = {
+        "VERSION:" .. (data.version or FILE_VERSION),
+        "SEED:" .. tostring(data.seed or ""),
+        "DIFFICULTY:" .. tostring(data.difficulty or "normal"),
+        "DATE:" .. tostring(data.metadata.recordingDate or ""),
+        "DURATION:" .. tostring(data.metadata.duration or 0),
+        "TOTAL_INPUTS:" .. tostring(data.metadata.totalInputs or #data.inputs),
+        "INPUTS:",
+    }
 
--- Start playback
-function Replay.startPlayback()
-    if not replayData or #replayData.inputs == 0 then
-        print("[Replay] No replay data to play")
-        return false
-    end
-    
-    playing = true
-    recording = false
-    playbackIndex = 1
-    playbackTime = 0
-    
-    print("[Replay] Playback started - Seed:", replayData.seed)
-    return true, replayData.seed, replayData.difficulty
-end
-
--- Stop playback
-function Replay.stopPlayback()
-    playing = false
-    playbackIndex = 1
-    playbackTime = 0
-    print("[Replay] Playback stopped")
-end
-
--- Get next input during playback
-function Replay.getNextInput()
-    if not playing or playbackIndex > #replayData.inputs then
-        return nil
-    end
-    
-    local input = replayData.inputs[playbackIndex]
-    
-    -- Check if it's time to execute this input
-    if playbackTime >= input.timestamp then
-        playbackIndex = playbackIndex + 1
-        return input
-    end
-    
-    return nil
-end
-
--- Check if currently recording
-function Replay.isRecording()
-    return recording
-end
-
--- Check if currently playing
-function Replay.isPlaying()
-    return playing
-end
-
--- Get replay metadata
-function Replay.getMetadata()
-    return replayData.metadata
-end
-
--- Get current playback progress (0 to 1)
-function Replay.getPlaybackProgress()
-    if not playing or not replayData.metadata.duration or replayData.metadata.duration == 0 then
-        return 0
-    end
-    return math.min(1, playbackTime / replayData.metadata.duration)
-end
-
--- List available replay files
-function Replay.listReplays()
-    local files = love.filesystem.getDirectoryItems(REPLAY_DIR)
-    local replays = {}
-    
-    for _, file in ipairs(files) do
-        if file:match("%.txt$") then
-            table.insert(replays, file)
-        end
-    end
-    
-    return replays
-end
-
--- Helper: Serialize replay data to string
-function serializeReplayData(data)
-    local lines = {}
-    
-    -- Header
-    table.insert(lines, "VERSION:" .. data.version)
-    table.insert(lines, "SEED:" .. (data.seed or ""))
-    table.insert(lines, "DIFFICULTY:" .. (data.difficulty or "normal"))
-    table.insert(lines, "DATE:" .. data.metadata.recordingDate)
-    table.insert(lines, "DURATION:" .. data.metadata.duration)
-    table.insert(lines, "TOTAL_INPUTS:" .. data.metadata.totalInputs)
-    table.insert(lines, "INPUTS:")
-    
-    -- Input events
-    for _, input in ipairs(data.inputs) do
+    for _, input in ipairs(data.inputs or {}) do
         table.insert(lines, string.format("%s|%s|%.4f", input.type, input.key, input.timestamp))
     end
-    
+
     return table.concat(lines, "\n")
 end
 
--- Helper: Deserialize replay data from string
-function deserializeReplayData(data)
-    local replay = {
-        version = "1.0",
-        seed = nil,
-        difficulty = "normal",
-        inputs = {},
-        metadata = {
-            recordingDate = "",
-            duration = 0,
-            totalInputs = 0
-        }
-    }
-    
+local function deserializeReplayData(data)
+    if not data or data == "" then
+        return nil
+    end
+
+    local replay = newReplayData(nil, "normal")
+    replay.metadata.recordingDate = ""
     local parsingInputs = false
-    
+
     for line in data:gmatch("[^\r\n]+") do
         if line == "INPUTS:" then
             parsingInputs = true
         elseif parsingInputs then
-            -- Parse input: type|key|timestamp
-            local inputType, key, timestamp = line:match("([^|]+)|([^|]+)|([%d%.]+)")
+            local inputType, key, timestamp = line:match("([^|]+)|([^|]+)|([%d%.%-]+)")
             if inputType and key and timestamp then
                 table.insert(replay.inputs, {
                     type = inputType,
                     key = key,
-                    timestamp = tonumber(timestamp)
+                    timestamp = tonumber(timestamp) or 0,
                 })
             end
         else
-            -- Parse header
             local key, value = line:match("([^:]+):(.*)")
             if key and value then
                 if key == "VERSION" then
@@ -300,8 +157,177 @@ function deserializeReplayData(data)
             end
         end
     end
-    
+
+    replay.metadata.totalInputs = replay.metadata.totalInputs or #replay.inputs
     return replay
+end
+
+function Replay.init()
+    local fs = getFilesystem()
+    fs.createDirectory(REPLAY_DIR)
+    recording = false
+    playing = false
+    playbackIndex = 1
+    playbackTime = 0
+    currentRecordingTime = 0
+    replayData = newReplayData(nil, nil)
+end
+
+function Replay.startRecording(seed, difficulty)
+    replayData = newReplayData(seed, difficulty)
+    recording = true
+    playing = false
+    playbackIndex = 1
+    playbackTime = 0
+    currentRecordingTime = 0
+end
+
+function Replay.stopRecording()
+    if not recording then
+        return
+    end
+
+    replayData.metadata.duration = currentRecordingTime
+    replayData.metadata.totalInputs = #replayData.inputs
+    recording = false
+end
+
+function Replay.recordInput(inputType, key, timestamp)
+    if not recording then
+        return
+    end
+
+    table.insert(replayData.inputs, {
+        type = inputType,
+        key = key,
+        timestamp = timestamp or currentRecordingTime,
+    })
+end
+
+function Replay.recordKeyState(key, isDown, timestamp)
+    Replay.recordInput(isDown and "keydown" or "keyup", key, timestamp)
+end
+
+function Replay.update(dt)
+    if recording then
+        currentRecordingTime = currentRecordingTime + dt
+    elseif playing then
+        playbackTime = playbackTime + dt
+    end
+end
+
+function Replay.save(filename)
+    if not replayData or #replayData.inputs == 0 then
+        return false
+    end
+
+    local fs = getFilesystem()
+    fs.createDirectory(REPLAY_DIR)
+
+    filename = normalizeFilename(filename)
+    local path = REPLAY_DIR .. "/" .. filename
+    replayData.metadata.duration = currentRecordingTime > 0 and currentRecordingTime or replayData.metadata.duration
+    replayData.metadata.totalInputs = #replayData.inputs
+    return fs.write(path, serializeReplayData(replayData))
+end
+
+function Replay.load(filename)
+    local fs = getFilesystem()
+    local path = REPLAY_DIR .. "/" .. normalizeFilename(filename)
+    local contents = fs.read(path)
+    local parsed = deserializeReplayData(contents)
+    if not parsed then
+        return false
+    end
+
+    replayData = parsed
+    recording = false
+    playing = false
+    playbackIndex = 1
+    playbackTime = 0
+    return true
+end
+
+function Replay.inspect(filename)
+    local fs = getFilesystem()
+    local path = REPLAY_DIR .. "/" .. normalizeFilename(filename)
+    local contents = fs.read(path)
+    return deserializeReplayData(contents)
+end
+
+function Replay.startPlayback()
+    if not replayData or #replayData.inputs == 0 then
+        return false
+    end
+
+    playing = true
+    recording = false
+    playbackIndex = 1
+    playbackTime = 0
+    return true, replayData.seed, replayData.difficulty
+end
+
+function Replay.stopPlayback()
+    playing = false
+    playbackIndex = 1
+    playbackTime = 0
+end
+
+function Replay.getNextInput()
+    if not playing or playbackIndex > #replayData.inputs then
+        return nil
+    end
+
+    local input = replayData.inputs[playbackIndex]
+    if playbackTime >= input.timestamp then
+        playbackIndex = playbackIndex + 1
+        if playbackIndex > #replayData.inputs then
+            playing = false
+        end
+        return input
+    end
+
+    return nil
+end
+
+function Replay.isRecording()
+    return recording
+end
+
+function Replay.isPlaying()
+    return playing
+end
+
+function Replay.hasData()
+    return replayData ~= nil and #replayData.inputs > 0
+end
+
+function Replay.getMetadata()
+    return replayData.metadata
+end
+
+function Replay.getPlaybackProgress()
+    if not replayData.metadata.duration or replayData.metadata.duration <= 0 then
+        return 0
+    end
+    return math.min(1, playbackTime / replayData.metadata.duration)
+end
+
+function Replay.listReplays()
+    local fs = getFilesystem()
+    local items = {}
+
+    for _, file in ipairs(fs.getDirectoryItems(REPLAY_DIR)) do
+        if file:match("%.txt$") then
+            table.insert(items, file)
+        end
+    end
+
+    table.sort(items, function(left, right)
+        return left > right
+    end)
+
+    return items
 end
 
 return Replay
