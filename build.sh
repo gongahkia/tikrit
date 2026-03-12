@@ -5,10 +5,9 @@ VERSION=$(cat VERSION)
 echo "Building Tikrit v$VERSION"
 echo "=========================="
 
-# Check if Love2D is installed
-if ! command -v love &> /dev/null; then
-    echo "Error: Love2D not found. Please install Love2D first."
-    echo "Visit: https://love2d.org/"
+# Check archive tooling
+if ! command -v zip &> /dev/null || ! command -v unzip &> /dev/null; then
+    echo "Error: zip and unzip are required to package Tikrit."
     exit 1
 fi
 
@@ -20,8 +19,8 @@ echo "Cleaning previous builds..."
 make clean-dist
 
 echo ""
-echo "Building .love file..."
-make love-file
+echo "Building and verifying .love file..."
+make verify-love-file
 
 echo ""
 echo "Build complete!"
