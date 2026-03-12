@@ -1,55 +1,49 @@
 #!/bin/bash
 
-# ---------- startup ----------
+set -e
 
-sudo apt update && sudo apt upgrade && sudo apt autoremove && clear
+echo "Checking Tikrit prerequisites"
+echo "============================="
 
-echo "
-▄▄▄█████▓ ██▓ ██ ▄█▀ ██▀███   ██▓▄▄▄█████▓
-▓  ██▒ ▓▒▓██▒ ██▄█▒ ▓██ ▒ ██▒▓██▒▓  ██▒ ▓▒
-▒ ▓██░ ▒░▒██▒▓███▄░ ▓██ ░▄█ ▒▒██▒▒ ▓██░ ▒░
-░ ▓██▓ ░ ░██░▓██ █▄ ▒██▀▀█▄  ░██░░ ▓██▓ ░ 
-  ▒██▒ ░ ░██░▒██▒ █▄░██▓ ▒██▒░██░  ▒██▒ ░ 
-  ▒ ░░   ░▓  ▒ ▒▒ ▓▒░ ▒▓ ░▒▓░░▓    ▒ ░░   
-    ░     ▒ ░░ ░▒ ▒░  ░▒ ░ ▒░ ▒ ░    ░    
-  ░       ▒ ░░ ░░ ░   ░░   ░  ▒ ░  ░      
-          ░  ░  ░      ░      ░           
-"
+missing=0
 
-# ---------- defaults ----------
-
-if command -v lua &> /dev/null; then
-    echo "lua already installed"
+if ! command -v lua >/dev/null 2>&1; then
+    echo "- Missing: lua"
+    missing=1
 else
-    echo "installing lua..."
-    sudo apt install lua5.4
+    echo "- Found: lua"
 fi
 
-sudo apt install luarocks
-sudo luarocks install inspect
-
-if command -v make &> /dev/null; then
-    echo "make already installed"
+if ! command -v luac >/dev/null 2>&1; then
+    echo "- Missing: luac"
+    missing=1
 else
-    echo "installing make..."
-    sudo apt install make  
+    echo "- Found: luac"
 fi
 
-if command -v love &> /dev/null; then
-    echo "love2d already installed"
+if ! command -v make >/dev/null 2>&1; then
+    echo "- Missing: make"
+    missing=1
 else
-    echo "installing love2d..."
-    sudo add-apt-repository ppa:bartbes/love-stable
-    sudo apt update
-    sudo apt install love
+    echo "- Found: make"
 fi
 
-echo "testing love2d installation"
-echo -e 'function love.draw()\n\tlove.graphics.print("Your installation is functioning if you can see this!", 200, 200)\nend' >> test/main.lua
-love test
-echo "love2d installation validated"
-rm test/main.lua
+if ! command -v love >/dev/null 2>&1; then
+    echo "- Missing: Love2D"
+    missing=1
+else
+    echo "- Found: Love2D"
+fi
 
-# ----------- end ----------
+if [ "$missing" -ne 0 ]; then
+    echo ""
+    echo "Install the missing tools, then run this script again."
+    exit 1
+fi
 
-echo "tikrit setup finished"
+echo ""
+echo "Running syntax checks and tests..."
+make test
+
+echo ""
+echo "Tikrit is ready to run with: make"

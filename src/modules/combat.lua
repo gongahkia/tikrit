@@ -1,126 +1,71 @@
--- Combat module for player attacks and monster health
 local CONFIG = require("config")
 
 local Combat = {}
 
--- Combat state
 Combat.attackCooldown = 0
-Combat.isAttacking = false
 Combat.attackDuration = 0
-Combat.attackDirection = {x = 0, y = 1}  -- Default facing down
+Combat.isAttacking = false
+Combat.attackDirection = {x = 0, y = 1}
 
--- Monster health tracking
-Combat.monsterHealth = {}
-
--- Initialize combat system
-function Combat.init(monsterCount)
+function Combat.init()
     Combat.attackCooldown = 0
-    Combat.isAttacking = false
     Combat.attackDuration = 0
-    Combat.monsterHealth = {}
-    
-    -- Initialize health for all monsters
-    for i = 1, monsterCount do
-        Combat.monsterHealth[i] = CONFIG.MONSTER_MAX_HEALTH or 3
-    end
+    Combat.isAttacking = false
+    Combat.attackDirection = {x = 0, y = 1}
 end
 
--- Update combat system
 function Combat.update(dt)
-    -- Update attack cooldown
-    if Combat.attackCooldown > 0 then
-        Combat.attackCooldown = Combat.attackCooldown - dt
-    end
-    
-    -- Update attack animation duration
+    Combat.attackCooldown = math.max(0, Combat.attackCooldown - dt)
     if Combat.isAttacking then
         Combat.attackDuration = Combat.attackDuration + dt
         if Combat.attackDuration >= CONFIG.ATTACK_ANIMATION_DURATION then
-            Combat.isAttacking = false
             Combat.attackDuration = 0
+            Combat.isAttacking = false
         end
     end
 end
 
--- Try to perform an attack
-function Combat.tryAttack(playerX, playerY, lastMoveX, lastMoveY)
+function Combat.tryAttack(lastMoveX, lastMoveY)
     if Combat.attackCooldown > 0 then
         return false
     end
-    
-    -- Set attack direction based on last movement
-    if lastMoveX ~= nil and lastMoveY ~= nil then
-        local magnitude = math.sqrt(lastMoveX * lastMoveX + lastMoveY * lastMoveY)
-        if magnitude > 0 then
-            Combat.attackDirection.x = lastMoveX / magnitude
-            Combat.attackDirection.y = lastMoveY / magnitude
-        end
+
+    if lastMoveX ~= 0 or lastMoveY ~= 0 then
+        Combat.attackDirection.x = lastMoveX
+        Combat.attackDirection.y = lastMoveY
     end
-    
-    Combat.isAttacking = true
+
+    Combat.attackCooldown = CONFIG.ATTACK_COOLDOWN
     Combat.attackDuration = 0
-    Combat.attackCooldown = CONFIG.ATTACK_COOLDOWN or 1.0
-    
+    Combat.isAttacking = true
     return true
 end
 
--- Get attack hitbox
-function Combat.getAttackHitbox(playerX, playerY)
-    local range = CONFIG.ATTACK_RANGE or 30
-    local centerX = playerX + CONFIG.TILE_SIZE / 2 + Combat.attackDirection.x * range
-    local centerY = playerY + CONFIG.TILE_SIZE / 2 + Combat.attackDirection.y * range
-    
+function Combat.getAttackHitbox(playerCoord)
+    local centerX = playerCoord[1] + (CONFIG.TILE_SIZE / 2) + (Combat.attackDirection.x * CONFIG.ATTACK_RANGE)
+    local centerY = playerCoord[2] + (CONFIG.TILE_SIZE / 2) + (Combat.attackDirection.y * CONFIG.ATTACK_RANGE)
     return {
-        x = centerX - CONFIG.TILE_SIZE / 2,
-        y = centerY - CONFIG.TILE_SIZE / 2,
+        x = centerX - (CONFIG.TILE_SIZE / 2),
+        y = centerY - (CONFIG.TILE_SIZE / 2),
         width = CONFIG.TILE_SIZE,
-        height = CONFIG.TILE_SIZE
+        height = CONFIG.TILE_SIZE,
     }
 end
 
--- Check if attack hits a monster
-function Combat.checkAttackHit(attackBox, monsterX, monsterY)
-    local monsterBox = {
-        x = monsterX,
-        y = monsterY,
-        width = CONFIG.TILE_SIZE,
-        height = CONFIG.TILE_SIZE
-    }
-    
-    return attackBox.x < monsterBox.x + monsterBox.width and
-           attackBox.x + attackBox.width > monsterBox.x and
-           attackBox.y < monsterBox.y + monsterBox.height and
-           attackBox.y + attackBox.height > monsterBox.y
+function Combat.hitMonster(monster, damage)
+    monster.health = monster.health - (damage or CONFIG.PLAYER_ATTACK_DAMAGE)
+    return monster.health <= 0
 end
 
--- Damage a monster
-function Combat.damageMonster(monsterIndex)
-    if Combat.monsterHealth[monsterIndex] then
-        Combat.monsterHealth[monsterIndex] = Combat.monsterHealth[monsterIndex] - 1
-        return Combat.monsterHealth[monsterIndex] <= 0
-    end
-    return false
+function Combat.checkAttackHit(box, coord)
+    return box.x < coord[1] + CONFIG.TILE_SIZE
+        and box.x + box.width > coord[1]
+        and box.y < coord[2] + CONFIG.TILE_SIZE
+        and box.y + box.height > coord[2]
 end
 
--- Get monster health
-function Combat.getMonsterHealth(monsterIndex)
-    return Combat.monsterHealth[monsterIndex] or 0
-end
-
--- Remove dead monster from health tracking
-function Combat.removeMonster(monsterIndex)
-    table.remove(Combat.monsterHealth, monsterIndex)
-end
-
--- Check if currently attacking
-function Combat.isCurrentlyAttacking()
-    return Combat.isAttacking
-end
-
--- Get attack cooldown percentage (for UI)
 function Combat.getCooldownPercentage()
-    local maxCooldown = CONFIG.ATTACK_COOLDOWN or 1.0
-    return 1.0 - (Combat.attackCooldown / maxCooldown)
+    return 1 - (Combat.attackCooldown / CONFIG.ATTACK_COOLDOWN)
 end
 
 return Combat

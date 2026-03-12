@@ -1,436 +1,242 @@
--- UI module for menus and screens
 local CONFIG = require("config")
+local Accessibility = require("modules/accessibility")
 
 local UI = {}
 
--- Draw functions for various screens
-function UI.drawTitleScreen(difficultyMenuSelection, fonts, dailyChallengeEnabled, timeAttackEnabled)
-    local text1 = "TIKRIT"
-    local text2 = "Select Difficulty"
-    local text3 = "Made by @gongahkia on Github in Love2D"
-    local difficulties = {"Easy", "Normal", "Hard", "Nightmare"}
-    
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.setFont(fonts.large)
-    love.graphics.print("TIKRIT", (love.graphics.getWidth() - fonts.large:getWidth(text1))/2, 50)
-    
-    love.graphics.setFont(fonts.medium)
-    love.graphics.print("Select Difficulty", (love.graphics.getWidth() - fonts.medium:getWidth(text2))/2, 150)
-    
-    -- Draw difficulty options
-    for i, diff in ipairs(difficulties) do
-        local y = 200 + (i * 50)
-        if i == difficultyMenuSelection then
-            love.graphics.setColor(1, 1, 0, 1)  -- Highlight selected
-            love.graphics.print("> " .. diff .. " <", (love.graphics.getWidth() - fonts.medium:getWidth("> " .. diff .. " <"))/2, y)
-        else
-            love.graphics.setColor(0.5, 0.5, 0.5, 1)
-            love.graphics.print(diff, (love.graphics.getWidth() - fonts.medium:getWidth(diff))/2, y)
-        end
-    end
-    
-    -- Mode indicators
-    love.graphics.setFont(fonts.small)
-    local yOffset = 420
-    
-    -- Daily challenge indicator
-    if dailyChallengeEnabled then
-        love.graphics.setColor(1, 0.84, 0, 1)  -- Gold for daily challenge
-        local Utils = require("modules/utils")
-        local dailyText = "DAILY CHALLENGE: " .. Utils.getDailyDateString()
-        love.graphics.print(dailyText, (love.graphics.getWidth() - fonts.small:getWidth(dailyText))/2, yOffset)
-        yOffset = yOffset + 25
-    end
-    
-    -- Time attack indicator
-    if timeAttackEnabled then
-        love.graphics.setColor(1, 0.4, 0.4, 1)  -- Red for time attack
-        local timeAttackText = "TIME ATTACK MODE ENABLED"
-        love.graphics.print(timeAttackText, (love.graphics.getWidth() - fonts.small:getWidth(timeAttackText))/2, yOffset)
-        yOffset = yOffset + 25
-    end
-    
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.print("Use UP/DOWN arrows to select, ENTER to start", (love.graphics.getWidth() - fonts.small:getWidth("Use UP/DOWN arrows to select, ENTER to start"))/2, 460)
-    love.graphics.print("Press D/T/S/Z for Daily/Time Attack/Stealth/Puzzle modes", (love.graphics.getWidth() - fonts.small:getWidth("Press D/T/S/Z for Daily/Time Attack/Stealth/Puzzle modes"))/2, 485)
-    love.graphics.print("Press P to view Progression & Unlocks", (love.graphics.getWidth() - fonts.small:getWidth("Press P to view Progression & Unlocks"))/2, 510)
-    love.graphics.print("Press F5 for Level Editor | F6 to Save Replay | F7 to Load Replay", (love.graphics.getWidth() - fonts.small:getWidth("Press F5 for Level Editor | F6 to Save Replay | F7 to Load Replay"))/2, 535)
-    love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
+local function drawCenteredText(font, text, y, settings, color)
+    Accessibility.setColor(settings, color[1], color[2], color[3], color[4] or 1)
+    love.graphics.setFont(font)
+    love.graphics.print(text, (CONFIG.WINDOW_WIDTH - font:getWidth(text)) / 2, y)
 end
 
--- Draw progression/unlocks screen
-function UI.drawProgressionScreen(fonts)
-    local Progression = require("modules/progression")
-    
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.setFont(fonts.large)
-    local title = "PROGRESSION & UNLOCKS"
-    love.graphics.print(title, (love.graphics.getWidth() - fonts.large:getWidth(title))/2, 30)
-    
-    love.graphics.setFont(fonts.small)
-    
-    -- Overall stats
-    love.graphics.setColor(0.7, 0.7, 1, 1)
-    love.graphics.print("Overall Statistics:", 50, 100)
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.print(string.format("Total Runs: %d", Progression.data.totalRuns), 70, 125)
-    love.graphics.print(string.format("Total Wins: %d", Progression.data.totalWins), 70, 145)
-    love.graphics.print(string.format("Total Deaths: %d", Progression.data.totalDeaths), 70, 165)
-    love.graphics.print(string.format("Keys Collected: %d", Progression.data.totalKeysCollected), 70, 185)
-    love.graphics.print(string.format("Monsters Killed: %d", Progression.data.totalMonstersKilled), 70, 205)
-    local fastestTime = Progression.data.fastestTime < math.huge and string.format("%.1fs", Progression.data.fastestTime) or "N/A"
-    love.graphics.print("Fastest Time: " .. fastestTime, 70, 225)
-    
-    -- Unlocks
-    love.graphics.setColor(0.7, 1, 0.7, 1)
-    love.graphics.print("Unlocked Abilities:", 50, 270)
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    
-    local unlockY = 295
-    local unlocks = Progression.data.unlocks
-    local unlockList = {
-        {name = "Speed Boost Start (+50)", unlocked = unlocks.speedBoostStart},
-        {name = "Invincibility Start (3s)", unlocked = unlocks.invincibilityStart},
-        {name = "Extra Inventory Slot (4)", unlocked = unlocks.extraInventorySlot},
-        {name = "Ghost Slow Start", unlocked = unlocks.ghostSlowStart},
-        {name = "Map Reveal (+3 vision)", unlocked = unlocks.mapReveal},
-        {name = "Combat Master (2x damage)", unlocked = unlocks.combatMaster},
-        {name = "Speed Runner (+100)", unlocked = unlocks.speedRunner},
-        {name = "Survivor (extra life)", unlocked = unlocks.survivor},
-    }
-    
-    for _, unlock in ipairs(unlockList) do
-        if unlock.unlocked then
-            love.graphics.setColor(0, 1, 0, 1)
-            love.graphics.print("✓ " .. unlock.name, 70, unlockY)
-        else
-            love.graphics.setColor(0.4, 0.4, 0.4, 1)
-            love.graphics.print("✗ " .. unlock.name, 70, unlockY)
+local function drawMenuList(items, selectedIndex, startY, fonts, settings)
+    for index, item in ipairs(items) do
+        local text = item.label
+        if item.value ~= nil then
+            text = string.format("%s: %s", item.label, tostring(item.value))
         end
+
+        local color = {0.72, 0.72, 0.72, 1}
+        if index == selectedIndex then
+            color = {1, 0.93, 0.35, 1}
+            text = "> " .. text .. " <"
+        end
+        drawCenteredText(fonts.medium, text, startY + ((index - 1) * 42), settings, color)
+    end
+end
+
+function UI.drawTitleScreen(state, fonts, settings)
+    drawCenteredText(fonts.large, "TIKRIT", 40, settings, {0.9, 0.9, 0.9, 1})
+    drawCenteredText(fonts.small, "Foundation-first survival horror build", 120, settings, {0.75, 0.75, 0.75, 1})
+    drawMenuList(state.titleItems, state.titleIndex, 180, fonts, settings)
+
+    local footer = {
+        "Up/Down selects, Left/Right changes values, Enter confirms",
+        "Settings and progression are available from the title and pause screens",
+        "F5 opens the editor only when debug tools are enabled",
+    }
+
+    for index, line in ipairs(footer) do
+        drawCenteredText(fonts.small, line, 470 + ((index - 1) * 24), settings, {0.55, 0.55, 0.55, 1})
+    end
+end
+
+function UI.drawSettingsScreen(screenState, fonts, settings)
+    drawCenteredText(fonts.large, "SETTINGS", 30, settings, {0.92, 0.92, 0.92, 1})
+
+    local categoryX = 70
+    for index, category in ipairs(screenState.categories) do
+        local active = index == screenState.categoryIndex
+        local color = active and {1, 0.93, 0.35, 1} or {0.6, 0.6, 0.6, 1}
+        Accessibility.setColor(settings, color[1], color[2], color[3], color[4])
+        love.graphics.setFont(fonts.small)
+        love.graphics.print(category, categoryX + ((index - 1) * 160), 100)
+    end
+
+    for index, item in ipairs(screenState.options) do
+        local y = 170 + ((index - 1) * 34)
+        local color = index == screenState.optionIndex and {1, 0.93, 0.35, 1} or {0.8, 0.8, 0.8, 1}
+        Accessibility.setColor(settings, color[1], color[2], color[3], color[4])
+        love.graphics.setFont(fonts.medium)
+        love.graphics.print(string.format("%s: %s", item.label, tostring(item.value)), 90, y)
+    end
+
+    local helpLines = {
+        "Left/Right adjusts values",
+        "Tab switches category",
+        "R resets defaults",
+        "Esc returns",
+    }
+    for index, line in ipairs(helpLines) do
+        drawCenteredText(fonts.small, line, 500 + ((index - 1) * 22), settings, {0.55, 0.55, 0.55, 1})
+    end
+end
+
+function UI.drawProgressionScreen(progressionData, fonts, settings)
+    drawCenteredText(fonts.large, "PROGRESSION", 30, settings, {0.92, 0.92, 0.92, 1})
+
+    local leftX = 70
+    local rightX = 330
+    local y = 110
+
+    Accessibility.setColor(settings, 0.7, 0.8, 1, 1)
+    love.graphics.setFont(fonts.small)
+    love.graphics.print("Overall Stats", leftX, y)
+    y = y + 30
+
+    local statsLines = {
+        "Runs: " .. progressionData.totalRuns,
+        "Wins: " .. progressionData.totalWins,
+        "Deaths: " .. progressionData.totalDeaths,
+        "Keys: " .. progressionData.totalKeysCollected,
+        "Monsters: " .. progressionData.totalMonstersKilled,
+        "Items: " .. progressionData.totalItemsCollected,
+        "Fastest: " .. (progressionData.fastestTime == math.huge and "N/A" or string.format("%.1fs", progressionData.fastestTime)),
+    }
+
+    Accessibility.setColor(settings, 0.82, 0.82, 0.82, 1)
+    for _, line in ipairs(statsLines) do
+        love.graphics.print(line, leftX, y)
+        y = y + 24
+    end
+
+    Accessibility.setColor(settings, 0.7, 1, 0.76, 1)
+    love.graphics.print("Unlocks", rightX, 110)
+
+    local unlockY = 140
+    for key, unlocked in pairs(progressionData.unlocks) do
+        local color = unlocked and {0.42, 1, 0.42, 1} or {0.45, 0.45, 0.45, 1}
+        Accessibility.setColor(settings, color[1], color[2], color[3], color[4])
+        love.graphics.print(string.format("%s %s", unlocked and "+" or "-", key), rightX, unlockY)
         unlockY = unlockY + 20
     end
-    
-    -- Unlock requirements
-    love.graphics.setColor(1, 1, 0.7, 1)
-    love.graphics.print("Unlock Requirements:", 320, 270)
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    
-    local reqs = Progression.getUnlockRequirements()
-    local reqY = 295
-    for _, req in ipairs(reqs) do
-        love.graphics.print(req, 340, reqY)
-        reqY = reqY + 20
-    end
-    
-    -- Instructions
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.print("Press ESC to return to title screen", (love.graphics.getWidth() - fonts.small:getWidth("Press ESC to return to title screen"))/2, 550)
-    love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth("Made by @gongahkia on Github in Love2D") - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
+
+    drawCenteredText(fonts.small, "Press Esc to return", 550, settings, {0.55, 0.55, 0.55, 1})
 end
 
-function UI.drawLoseScreen(world, stats, fonts)
-    local text1 = "Try again next time!"
-    local text2 = string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount)
-    local text3 = "Made by @gongahkia on Github in Love2D"
-    local roomCount = 0
-    for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
-    local elapsedGameTime = math.floor((stats.finishTime > 0 and stats.finishTime or love.timer.getTime()) - stats.startTime)
-    
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.setFont(fonts.large)
-    love.graphics.print("Try again next time!", (love.graphics.getWidth() - fonts.large:getWidth(text1))/2, 80)
-    love.graphics.setFont(fonts.medium)
-    love.graphics.print(string.format("You collected %d out of %d keys.", world.player.overallKeyCount, world.key.globalCount), (love.graphics.getWidth() - fonts.medium:getWidth(text2))/2, 200)
-    
-    -- Display statistics
-    love.graphics.setFont(fonts.small)
-    local statsText = string.format("Time: %d seconds | Rooms: %d | Items: %d", elapsedGameTime, roomCount, stats.itemsUsed)
-    love.graphics.print(statsText, (love.graphics.getWidth() - fonts.small:getWidth(statsText))/2, 260)
-    love.graphics.print("Difficulty: " .. CONFIG.DIFFICULTY, (love.graphics.getWidth() - fonts.small:getWidth("Difficulty: " .. CONFIG.DIFFICULTY))/2, 290)
-    
-    -- Progression stats
-    local Progression = require("modules/progression")
-    love.graphics.setColor(0.7, 0.7, 1, 1)
-    local progText = string.format("Total: %d runs | %d wins | %d deaths", 
-        Progression.data.totalRuns, Progression.data.totalWins, Progression.data.totalDeaths)
-    love.graphics.print(progText, (love.graphics.getWidth() - fonts.small:getWidth(progText))/2, 330)
-    
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.setFont(fonts.small)
-    love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
-end
-
-function UI.drawWinScreen(world, stats, fonts, dailyChallengeEnabled)
-    local text1 = "You Win!"
-    local text3 = "Made by @gongahkia on Github in Love2D"
-    local roomCount = 0
-    for _ in pairs(stats.roomsVisited) do roomCount = roomCount + 1 end
-    local elapsedGameTime = math.floor((stats.finishTime > 0 and stats.finishTime or love.timer.getTime()) - stats.startTime)
-    
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.setFont(fonts.large)
-    love.graphics.print("You Win!", (love.graphics.getWidth() - fonts.large:getWidth(text1))/2, 80)
-    love.graphics.setFont(fonts.medium)
-    love.graphics.print(string.format("You collected all %d keys!", world.key.globalCount), (love.graphics.getWidth() - fonts.medium:getWidth(string.format("You collected all %d keys!", world.key.globalCount)))/2, 200)
-    
-    -- Display statistics
-    love.graphics.setFont(fonts.small)
-    local statsText = string.format("Time: %d seconds | Rooms: %d | Items: %d | Deaths: %d", elapsedGameTime, roomCount, stats.itemsUsed, stats.deaths)
-    love.graphics.print(statsText, (love.graphics.getWidth() - fonts.small:getWidth(statsText))/2, 260)
-    love.graphics.print("Difficulty: " .. CONFIG.DIFFICULTY, (love.graphics.getWidth() - fonts.small:getWidth("Difficulty: " .. CONFIG.DIFFICULTY))/2, 290)
-    
-    -- Daily challenge indicator
-    if dailyChallengeEnabled then
-        love.graphics.setColor(1, 0.84, 0, 1)
-        local Utils = require("modules/utils")
-        local dailyText = "Daily Challenge: " .. Utils.getDailyDateString()
-        love.graphics.print(dailyText, (love.graphics.getWidth() - fonts.small:getWidth(dailyText))/2, 315)
-    end
-    
-    -- Grade system
-    local grade = UI.calculateGrade(stats.deaths, elapsedGameTime)
-    love.graphics.setFont(fonts.large)
-    love.graphics.setColor(1, 1, 0, 1)
-    love.graphics.print("Grade: " .. grade, (love.graphics.getWidth() - fonts.large:getWidth("Grade: " .. grade))/2, 340)
-    
-    -- Progression stats and unlocks
-    local Progression = require("modules/progression")
-    love.graphics.setFont(fonts.small)
-    love.graphics.setColor(0.7, 0.7, 1, 1)
-    local progText = string.format("Total: %d runs | %d wins | Best: %ds", 
-        Progression.data.totalRuns, Progression.data.totalWins, 
-        Progression.data.fastestTime < math.huge and math.floor(Progression.data.fastestTime) or 0)
-    love.graphics.print(progText, (love.graphics.getWidth() - fonts.small:getWidth(progText))/2, 400)
-    
-    -- Show new unlocks if any
-    local newUnlocks = Progression.checkUnlocks()
-    if #newUnlocks > 0 then
-        love.graphics.setColor(0, 1, 0, 1)
-        love.graphics.print("NEW UNLOCKS!", (love.graphics.getWidth() - fonts.small:getWidth("NEW UNLOCKS!"))/2, 430)
-        for i, unlock in ipairs(newUnlocks) do
-            love.graphics.print("- " .. unlock, 150, 450 + (i-1)*20)
-        end
-    end
-    
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.setFont(fonts.small)
-    love.graphics.print("Made by @gongahkia on Github in Love2D", (love.graphics.getWidth() - fonts.small:getWidth(text3) - 10), (love.graphics.getHeight() - fonts.small:getHeight() - 10))
-end
-
-function UI.drawPauseScreen(pauseMenuSelection, fonts)
-    -- Draw semi-transparent overlay
-    love.graphics.setColor(0, 0, 0, 0.7)
+function UI.drawPauseScreen(options, selectedIndex, fonts, settings)
+    Accessibility.setColor(settings, 0, 0, 0, 0.72)
     love.graphics.rectangle("fill", 0, 0, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT)
-    
-    -- Draw menu
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.setFont(fonts.large)
-    local title = "PAUSED"
-    love.graphics.print(title, (CONFIG.WINDOW_WIDTH - fonts.large:getWidth(title))/2, 150)
-    
-    love.graphics.setFont(fonts.medium)
-    local options = {"Resume", "Restart", "Quit to Title"}
-    for i, option in ipairs(options) do
-        local y = 300 + (i * 60)
-        if i == pauseMenuSelection then
-            love.graphics.setColor(1, 1, 0, 1)
-            love.graphics.print("> " .. option .. " <", (CONFIG.WINDOW_WIDTH - fonts.medium:getWidth("> " .. option .. " <"))/2, y)
-        else
-            love.graphics.setColor(0.7, 0.7, 0.7, 1)
-            love.graphics.print(option, (CONFIG.WINDOW_WIDTH - fonts.medium:getWidth(option))/2, y)
-        end
-    end
+    drawCenteredText(fonts.large, "PAUSED", 120, settings, {1, 1, 1, 1})
+    drawMenuList(options, selectedIndex, 240, fonts, settings)
 end
 
-function UI.drawHUD(world, activeEffects, debugMode, fonts)
-    if not debugMode then
-        love.graphics.setColor(0, 0, 0, 0.7)
-        love.graphics.rectangle("fill", 0, 0, 200, 140)
-        
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.setFont(fonts.small)
-        love.graphics.print("Keys: " .. world.player.overallKeyCount .. "/" .. world.key.globalCount, 10, 10)
-        love.graphics.print("Room: " .. world.player.currRoom, 10, 35)
-        
-        -- Show inventory
-        local CONFIG = require("config")
-        if CONFIG.INVENTORY_ENABLED then
-            love.graphics.print("Inventory (1-3):", 10, 60)
-            for i = 1, CONFIG.INVENTORY_SIZE do
-                local item = world.player.inventory[i]
-                if item then
-                    love.graphics.setColor(0, 1, 1, 1)  -- Cyan for items
-                    love.graphics.print(i .. ": Item", 10, 60 + (i * 20))
-                else
-                    love.graphics.setColor(0.5, 0.5, 0.5, 1)  -- Gray for empty
-                    love.graphics.print(i .. ": ---", 10, 60 + (i * 20))
-                end
-            end
-        end
-        
-        -- Show active effects
-        love.graphics.setColor(1, 1, 1, 1)
-        if activeEffects.invincibility then
-            love.graphics.setColor(1, 1, 0, 1)
-            love.graphics.print("Invincible!", 10, 130)
-        elseif activeEffects.ghostSlow then
-            love.graphics.setColor(0, 1, 1, 1)
-            love.graphics.print("Ghosts Slowed", 10, 130)
-        elseif activeEffects.mapReveal then
-            love.graphics.setColor(1, 0.5, 0, 1)
-            love.graphics.print("Map Revealed", 10, 130)
-        end
+function UI.drawHUD(run, fonts, settings)
+    local player = run.world.player
+
+    Accessibility.setColor(settings, 0, 0, 0, 0.72)
+    love.graphics.rectangle("fill", 0, 0, 240, 170)
+
+    Accessibility.setColor(settings, 1, 1, 1, 1)
+    love.graphics.setFont(fonts.small)
+    love.graphics.print(string.format("Keys: %d/%d", player.overallKeyCount, run.world.totalKeys), 10, 10)
+    love.graphics.print("Difficulty: " .. run.difficultyName, 10, 34)
+    love.graphics.print("Inventory:", 10, 58)
+
+    for index = 1, player.inventorySize do
+        local item = player.inventory[index]
+        local label = item and item.kind or "---"
+        love.graphics.print(string.format("%d: %s", index, label), 20, 58 + (index * 18))
     end
+
+    love.graphics.print("Sanity", 10, 132)
+    Accessibility.setColor(settings, 0.2, 0.2, 0.2, 1)
+    love.graphics.rectangle("fill", 70, 136, 140, 14)
+
+    local sanityRatio = player.sanity / player.maxSanity
+    local color = {0.35, 0.92, 0.48, 1}
+    if player.sanity <= CONFIG.SANITY_BREAK_THRESHOLD then
+        color = {1, 0.32, 0.32, 1}
+    elseif player.sanity <= CONFIG.SANITY_CRITICAL_THRESHOLD then
+        color = {1, 0.72, 0.2, 1}
+    elseif player.sanity <= CONFIG.SANITY_LOW_THRESHOLD then
+        color = {0.95, 0.88, 0.28, 1}
+    end
+    Accessibility.setColor(settings, color[1], color[2], color[3], color[4])
+    love.graphics.rectangle("fill", 70, 136, 140 * sanityRatio, 14)
+
+    Accessibility.setColor(settings, 1, 1, 1, 1)
+    love.graphics.print(string.format("%d", math.floor(player.sanity)), 220, 132)
 end
 
--- Draw minimap overlay
-function UI.drawMinimap(world, minimapEnabled)
-    if not minimapEnabled then
+function UI.drawSanityOverlay(run, fonts, settings)
+    local tier = run.runtime.sanityEffects.tier
+    if tier == "stable" then
         return
     end
-    
-    local scale = CONFIG.MINIMAP_SCALE
+
+    local alpha = 0.08
+    if tier == "low" then
+        alpha = 0.14
+    elseif tier == "critical" then
+        alpha = 0.2
+    elseif tier == "broken" then
+        alpha = 0.26
+    elseif tier == "panic" then
+        alpha = 0.34
+    end
+
+    Accessibility.setColor(settings, 1, 0.08, 0.08, alpha)
+    love.graphics.rectangle("fill", 0, 0, CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT)
+
+    if tier == "broken" or tier == "panic" then
+        drawCenteredText(fonts.medium, "THE DARK IS LISTENING", 30, settings, {1, 0.35, 0.35, 1})
+    elseif tier == "critical" then
+        drawCenteredText(fonts.medium, "KEEP IT TOGETHER", 30, settings, {1, 0.55, 0.3, 1})
+    end
+end
+
+function UI.drawWinScreen(run, fonts, settings)
+    drawCenteredText(fonts.large, "YOU ESCAPED", 90, settings, {0.95, 0.95, 0.95, 1})
+    drawCenteredText(fonts.medium, string.format("Time: %.1fs", run.stats.finishTime - run.stats.startTime), 200, settings, {0.72, 0.72, 0.72, 1})
+    drawCenteredText(fonts.medium, string.format("Keys: %d", run.stats.keysCollected), 250, settings, {0.72, 0.72, 0.72, 1})
+    drawCenteredText(fonts.medium, string.format("Sanity left: %d", math.floor(run.world.player.sanity)), 300, settings, {0.72, 0.72, 0.72, 1})
+    drawCenteredText(fonts.small, "Enter returns to title", 520, settings, {0.55, 0.55, 0.55, 1})
+end
+
+function UI.drawLoseScreen(run, fonts, settings)
+    drawCenteredText(fonts.large, "YOU WERE CONSUMED", 90, settings, {0.95, 0.95, 0.95, 1})
+    drawCenteredText(fonts.medium, string.format("Time: %.1fs", run.stats.finishTime - run.stats.startTime), 200, settings, {0.72, 0.72, 0.72, 1})
+    drawCenteredText(fonts.medium, string.format("Deaths: %d", run.stats.deaths), 250, settings, {0.72, 0.72, 0.72, 1})
+    drawCenteredText(fonts.medium, string.format("Sanity left: %d", math.floor(run.world.player.sanity)), 300, settings, {0.72, 0.72, 0.72, 1})
+    drawCenteredText(fonts.small, "Enter returns to title", 520, settings, {0.55, 0.55, 0.55, 1})
+end
+
+function UI.drawMinimap(run, settings)
+    local tileSize = CONFIG.TILE_SIZE * CONFIG.MINIMAP_SCALE
     local offsetX = CONFIG.MINIMAP_POSITION_X
     local offsetY = CONFIG.MINIMAP_POSITION_Y
-    local mapSize = CONFIG.MINIMAP_SIZE
-    
-    -- Draw background
-    love.graphics.setColor(0, 0, 0, CONFIG.MINIMAP_BACKGROUND_ALPHA)
-    love.graphics.rectangle("fill", offsetX, offsetY, mapSize, mapSize)
-    
-    -- Draw border
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.rectangle("line", offsetX, offsetY, mapSize, mapSize)
-    
-    -- Draw walls (gray)
-    love.graphics.setColor(0.4, 0.4, 0.4, 1)
-    for _, wallCoord in ipairs(world.wall.coord) do
-        local x = offsetX + (wallCoord[1] * scale)
-        local y = offsetY + (wallCoord[2] * scale)
-        local size = CONFIG.TILE_SIZE * scale
-        if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
-            love.graphics.rectangle("fill", x, y, math.max(1, size), math.max(1, size))
-        end
-    end
-    
-    -- Draw doors (yellow)
-    love.graphics.setColor(1, 1, 0, 0.7)
-    for _, doorCoord in ipairs(world.door.coord) do
-        local x = offsetX + (doorCoord[1] * scale)
-        local y = offsetY + (doorCoord[2] * scale)
-        local size = CONFIG.TILE_SIZE * scale
-        if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
-            love.graphics.rectangle("fill", x, y, math.max(2, size), math.max(2, size))
-        end
-    end
-    
-    -- Draw keys (gold)
-    if CONFIG.MINIMAP_SHOW_KEYS then
-        love.graphics.setColor(1, 0.84, 0, 1)
-        for _, keyCoord in ipairs(world.key.coord) do
-            local x = offsetX + (keyCoord[1] * scale) + (CONFIG.TILE_SIZE * scale / 2)
-            local y = offsetY + (keyCoord[2] * scale) + (CONFIG.TILE_SIZE * scale / 2)
-            if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
-                love.graphics.circle("fill", x, y, math.max(2, 3 * scale))
-            end
-        end
-    end
-    
-    -- Draw items (cyan)
-    if CONFIG.MINIMAP_SHOW_ITEMS then
-        love.graphics.setColor(0, 1, 1, 1)
-        for _, itemCoord in ipairs(world.item.coord) do
-            local x = offsetX + (itemCoord[1] * scale) + (CONFIG.TILE_SIZE * scale / 2)
-            local y = offsetY + (itemCoord[2] * scale) + (CONFIG.TILE_SIZE * scale / 2)
-            if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
-                love.graphics.circle("fill", x, y, math.max(2, 2 * scale))
-            end
-        end
-    end
-    
-    -- Draw ghosts (red)
-    if CONFIG.MINIMAP_SHOW_GHOSTS and world.player.alive then
-        love.graphics.setColor(1, 0, 0, 0.8)
-        for _, monsterCoord in ipairs(world.monster.coord) do
-            local x = offsetX + (monsterCoord[1] * scale) + (CONFIG.TILE_SIZE * scale / 2)
-            local y = offsetY + (monsterCoord[2] * scale) + (CONFIG.TILE_SIZE * scale / 2)
-            if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
-                love.graphics.circle("fill", x, y, math.max(2, 3 * scale))
-            end
-        end
-    end
-    
-    -- Draw player (green)
-    if world.player.alive then
-        love.graphics.setColor(0, 1, 0, 1)
-        local x = offsetX + (world.player.coord[1] * scale) + (CONFIG.TILE_SIZE * scale / 2)
-        local y = offsetY + (world.player.coord[2] * scale) + (CONFIG.TILE_SIZE * scale / 2)
-        if x >= offsetX and x < offsetX + mapSize and y >= offsetY and y < offsetY + mapSize then
-            love.graphics.circle("fill", x, y, math.max(3, 4 * scale))
-        end
-    end
-    
-    -- Draw label
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("MAP (M)", offsetX + 5, offsetY + mapSize + 5)
-end
 
--- Calculate grade based on performance
-function UI.calculateGrade(deaths, elapsedTime)
-    if deaths == 0 and elapsedTime < 120 then 
-        return "S"
-    elseif deaths == 0 and elapsedTime < 180 then 
-        return "A"
-    elseif deaths <= 1 and elapsedTime < 240 then 
-        return "B"
-    elseif deaths <= 2 then 
-        return "C"
-    else
-        return "D"
-    end
-end
+    Accessibility.setColor(settings, 0, 0, 0, CONFIG.MINIMAP_BACKGROUND_ALPHA)
+    love.graphics.rectangle("fill", offsetX, offsetY, CONFIG.MINIMAP_SIZE, CONFIG.MINIMAP_SIZE)
 
--- Draw time attack UI (timer, par time, bonuses)
-function UI.drawTimeAttackUI(timeAttack, fonts)
-    if not timeAttack.enabled then return end
-    
-    love.graphics.setFont(fonts.small)
-    
-    -- Calculate adjusted time (actual time - bonuses)
-    local adjustedTime = math.max(0, timeAttack.elapsedGameTime - timeAttack.itemBonus)
-    local minutes = math.floor(adjustedTime / 60)
-    local seconds = math.floor(adjustedTime % 60)
-    local parMinutes = math.floor(timeAttack.parTime / 60)
-    local parSeconds = math.floor(timeAttack.parTime % 60)
-    
-    -- Determine color based on performance
-    local color
-    if adjustedTime < timeAttack.parTime * 0.8 then
-        color = {0, 1, 0, 1}  -- Green - excellent
-    elseif adjustedTime < timeAttack.parTime then
-        color = {1, 1, 0, 1}  -- Yellow - good
-    elseif adjustedTime < timeAttack.parTime * 1.2 then
-        color = {1, 0.6, 0, 1}  -- Orange - par
-    else
-        color = {1, 0, 0, 1}  -- Red - over par
+    for y = 1, #run.world.grid do
+        for x = 1, #run.world.grid[y] do
+            local color = run.world.grid[y][x] == 1 and {0.24, 0.24, 0.24, 1} or {0.48, 0.48, 0.48, 1}
+            Accessibility.setColor(settings, color[1], color[2], color[3], color[4])
+            love.graphics.rectangle("fill", offsetX + ((x - 1) * tileSize), offsetY + ((y - 1) * tileSize), tileSize, tileSize)
+        end
     end
-    
-    -- Draw timer
-    love.graphics.setColor(unpack(color))
-    local timerText = string.format("Time: %02d:%02d", minutes, seconds)
-    love.graphics.print(timerText, 10, 60)
-    
-    -- Draw par time
-    love.graphics.setColor(0.7, 0.7, 0.7, 1)
-    local parText = string.format("Par: %02d:%02d", parMinutes, parSeconds)
-    love.graphics.print(parText, 10, 85)
-    
-    -- Draw bonus time if any
-    if timeAttack.itemBonus > 0 then
-        love.graphics.setColor(0, 1, 0, 1)
-        love.graphics.print(string.format("Bonus: -%ds", timeAttack.itemBonus), 10, 110)
+
+    Accessibility.setColor(settings, 1, 0.84, 0, 1)
+    for _, key in ipairs(run.world.keys) do
+        local gx = (key.coord[1] / CONFIG.TILE_SIZE) * tileSize
+        local gy = (key.coord[2] / CONFIG.TILE_SIZE) * tileSize
+        love.graphics.circle("fill", offsetX + gx + (tileSize / 2), offsetY + gy + (tileSize / 2), 2)
     end
+
+    Accessibility.setColor(settings, 1, 0.3, 0.3, 0.9)
+    for _, monster in ipairs(run.world.monsters) do
+        local gx = (monster.coord[1] / CONFIG.TILE_SIZE) * tileSize
+        local gy = (monster.coord[2] / CONFIG.TILE_SIZE) * tileSize
+        love.graphics.circle("fill", offsetX + gx + (tileSize / 2), offsetY + gy + (tileSize / 2), 2)
+    end
+
+    Accessibility.setColor(settings, 0.3, 1, 0.45, 1)
+    local player = run.world.player
+    local px = (player.coord[1] / CONFIG.TILE_SIZE) * tileSize
+    local py = (player.coord[2] / CONFIG.TILE_SIZE) * tileSize
+    love.graphics.circle("fill", offsetX + px + (tileSize / 2), offsetY + py + (tileSize / 2), 3)
 end
 
 return UI
-

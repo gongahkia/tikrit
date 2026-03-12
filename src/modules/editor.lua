@@ -2,6 +2,7 @@
 -- In-game level editor for rapid level design iteration
 
 local Editor = {}
+local SAVE_DIR = "editor_maps"
 
 -- Editor state
 local state = {
@@ -302,6 +303,7 @@ end
 
 -- Save map to file
 function Editor.saveMap()
+  love.filesystem.createDirectory(SAVE_DIR)
   local lines = {}
   for y = 0, state.mapHeight - 1 do
     local line = ""
@@ -312,10 +314,11 @@ function Editor.saveMap()
   end
   
   local content = table.concat(lines, "\n")
-  local success = love.filesystem.write("map/" .. state.filename, content)
+  local path = SAVE_DIR .. "/" .. state.filename
+  local success = love.filesystem.write(path, content)
   
   if success then
-    print("Map saved to map/" .. state.filename)
+    print("Map saved to " .. path)
   else
     print("Failed to save map")
   end
@@ -323,7 +326,8 @@ end
 
 -- Load map from file
 function Editor.loadMap()
-  local content, err = love.filesystem.read("map/" .. state.filename)
+  local path = SAVE_DIR .. "/" .. state.filename
+  local content, err = love.filesystem.read(path)
   if not content then
     print("Failed to load map: " .. (err or "unknown error"))
     return
@@ -345,7 +349,7 @@ function Editor.loadMap()
   end
   
   Editor.saveToHistory()
-  print("Map loaded from map/" .. state.filename)
+  print("Map loaded from " .. path)
 end
 
 -- Draw editor

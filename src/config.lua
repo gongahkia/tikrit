@@ -1,210 +1,138 @@
--- ---------- CONFIGURATION ----------
--- All game constants and configurable values
--- This allows easy tweaking without modifying core game code
-
 local CONFIG = {}
 
--- ---------- GAMEPLAY SETTINGS ----------
-
--- Player settings
-CONFIG.PLAYER_SPEED = 200
-CONFIG.PLAYER_SPEED_BUFF = 200
-CONFIG.PLAYER_SPEED_BUFF_DURATION = 5 -- seconds
-CONFIG.INVINCIBILITY_DURATION = 5 -- seconds
-CONFIG.MAP_REVEAL_DURATION = 3 -- seconds
-
--- Monster settings
-CONFIG.MONSTER_SPEED = 50
-CONFIG.GHOST_PROXIMITY_THRESHOLD = 100 -- distance for ghost scream sound
-CONFIG.GHOST_SLOW_MULTIPLIER = 0.5 -- how much to slow ghosts
-
--- Map settings
-CONFIG.TILE_SIZE = 20
-CONFIG.MAP_WIDTH = 600
-CONFIG.MAP_HEIGHT = 600
-CONFIG.MAX_ROOMS = 9
-CONFIG.MIN_ROOMS = 3
-
--- Vision settings (for fog of war)
-CONFIG.VISION_RADIUS = 7 -- tiles
-CONFIG.FOG_ENABLED = false -- toggle fog of war
-CONFIG.SHOW_VISITED = true -- show previously visited areas
-CONFIG.VISITED_ALPHA = 0.3 -- transparency for visited areas
-
--- Debug settings
-CONFIG.DEBUG_MODE = false -- toggle with F3
-CONFIG.GOD_MODE = false -- toggle with F4 (no collision)
-CONFIG.SHOW_FPS = true
-CONFIG.SHOW_COLLISION_BOXES = true
-CONFIG.SHOW_AI_VECTORS = true
-
--- Difficulty settings (affects spawn rates and speeds)
-CONFIG.DIFFICULTY = "normal" -- easy, normal, hard, nightmare
-CONFIG.DIFFICULTY_SETTINGS = {
-    easy = {
-        monsterSpeed = 35,
-        playerSpeed = 250,
-        itemSpawnMultiplier = 1.5,
-        requiredKeyPercentage = 0.6,
-        visionRadius = 7
-    },
-    normal = {
-        monsterSpeed = 50,
-        playerSpeed = 200,
-        itemSpawnMultiplier = 1.0,
-        requiredKeyPercentage = 1.0,
-        visionRadius = 7
-    },
-    hard = {
-        monsterSpeed = 70,
-        playerSpeed = 180,
-        itemSpawnMultiplier = 0.7,
-        requiredKeyPercentage = 1.0,
-        visionRadius = 6
-    },
-    nightmare = {
-        monsterSpeed = 90,
-        playerSpeed = 150,
-        itemSpawnMultiplier = 0.4,
-        requiredKeyPercentage = 1.0,
-        fogEnabled = true,
-        permadeath = true,
-        visionRadius = 4
-    }
-}
-
--- ---------- VISUAL SETTINGS ----------
+CONFIG.VERSION = "2.6.0"
 
 CONFIG.WINDOW_TITLE = "tikrit"
 CONFIG.WINDOW_WIDTH = 600
 CONFIG.WINDOW_HEIGHT = 600
-CONFIG.BACKGROUND_GRAY = 0.5
-
--- ---------- AUDIO SETTINGS ----------
-
-CONFIG.VOLUME_MASTER = 1.0
-CONFIG.VOLUME_MUSIC = 0.7
-CONFIG.VOLUME_SFX = 1.0
-
--- ---------- UI SETTINGS ----------
+CONFIG.TILE_SIZE = 20
+CONFIG.GRID_WIDTH = CONFIG.WINDOW_WIDTH / CONFIG.TILE_SIZE
+CONFIG.GRID_HEIGHT = CONFIG.WINDOW_HEIGHT / CONFIG.TILE_SIZE
 
 CONFIG.FONT_SIZE_LARGE = 80
 CONFIG.FONT_SIZE_MEDIUM = 40
-CONFIG.FONT_SIZE_SMALL = 25
+CONFIG.FONT_SIZE_SMALL = 22
 
--- ---------- STATISTICS TRACKING ----------
+CONFIG.PLAYER_BASE_SPEED = 200
+CONFIG.PLAYER_SPEED_BUFF = 60
+CONFIG.PLAYER_SPEED_BUFF_DURATION = 6
+CONFIG.PLAYER_ATTACK_DAMAGE = 1
+CONFIG.ATTACK_COOLDOWN = 0.75
+CONFIG.ATTACK_RANGE = 34
+CONFIG.ATTACK_ANIMATION_DURATION = 0.18
+CONFIG.MONSTER_MAX_HEALTH = 3
 
-CONFIG.TRACK_STATS = true
-CONFIG.STATS_FILE = "stats.txt"
-CONFIG.HIGH_SCORES_FILE = "highscores.txt"
+CONFIG.VISION_BASE_RADIUS = 7
+CONFIG.VISION_MIN_RADIUS = 2
 
--- ---------- PARTICLE EFFECTS ----------
+CONFIG.MINIMAP_SIZE = 150
+CONFIG.MINIMAP_SCALE = 0.25
+CONFIG.MINIMAP_POSITION_X = 10
+CONFIG.MINIMAP_POSITION_Y = 120
+CONFIG.MINIMAP_BACKGROUND_ALPHA = 0.72
+
+CONFIG.DIFFICULTY_SETTINGS = {
+    easy = {
+        playerSpeed = 230,
+        monsterSpeed = 38,
+        spawnBudget = 4,
+        itemMultiplier = 1.4,
+        visionBonus = 1,
+        forcedFog = false,
+        keyCount = 3,
+    },
+    normal = {
+        playerSpeed = 200,
+        monsterSpeed = 48,
+        spawnBudget = 6,
+        itemMultiplier = 1.0,
+        visionBonus = 0,
+        forcedFog = false,
+        keyCount = 4,
+    },
+    hard = {
+        playerSpeed = 185,
+        monsterSpeed = 62,
+        spawnBudget = 8,
+        itemMultiplier = 0.8,
+        visionBonus = -1,
+        forcedFog = true,
+        keyCount = 5,
+    },
+    nightmare = {
+        playerSpeed = 165,
+        monsterSpeed = 78,
+        spawnBudget = 10,
+        itemMultiplier = 0.65,
+        visionBonus = -2,
+        forcedFog = true,
+        keyCount = 6,
+    }
+}
+
+CONFIG.PROCGEN_MAX_DEPTH = 4
+CONFIG.PROCGEN_MIN_ROOM_SIZE = 6
+CONFIG.PROCGEN_MAX_ROOM_SIZE = 11
+CONFIG.PROCGEN_CORRIDOR_PADDING = 1
+CONFIG.PROCGEN_SAFE_ROOM_PADDING = 2
+CONFIG.PROCGEN_DARK_ZONE_COUNT = 2
+CONFIG.PROCGEN_RECOVERY_ROOM_COUNT = 1
+
+CONFIG.SHRINE_RADIUS = 42
+CONFIG.SAFE_ZONE_PADDING = 20
+
+CONFIG.TIME_ATTACK_PAR_TIMES = {
+    easy = 300,
+    normal = 210,
+    hard = 150,
+    nightmare = 105,
+}
+CONFIG.TIME_ATTACK_SPEED_INCREASE_INTERVAL = 30
+CONFIG.TIME_ATTACK_SPEED_INCREASE_AMOUNT = 4
+
+CONFIG.MASTER_VOLUME = 0.7
+CONFIG.AMBIENT_BASE_VOLUME = 0.28
+CONFIG.GHOST_AUDIO_MAX_DISTANCE = 260
+CONFIG.GHOST_AUDIO_MIN_DISTANCE = 40
 
 CONFIG.PARTICLES_ENABLED = true
-CONFIG.PARTICLE_COUNT_KEY = 20
-CONFIG.PARTICLE_COUNT_ITEM = 15
-CONFIG.PARTICLE_COUNT_DEATH = 30
+CONFIG.PARTICLE_COUNT_KEY = 16
+CONFIG.PARTICLE_COUNT_ITEM = 14
+CONFIG.PARTICLE_COUNT_DEATH = 26
 CONFIG.PARTICLE_COUNT_DOOR = 10
-CONFIG.PARTICLE_LIFETIME = 1.0
 
--- ---------- SCREEN SHAKE ----------
+CONFIG.SCREEN_SHAKE_INTENSITY = 5
+CONFIG.SCREEN_SHAKE_DURATION = 0.25
 
-CONFIG.SCREEN_SHAKE_ENABLED = true
-CONFIG.SHAKE_INTENSITY = 5
-CONFIG.SHAKE_DURATION = 0.3
-
--- Animation settings
-CONFIG.ANIMATIONS_ENABLED = true
 CONFIG.GHOST_BOB_SPEED = 3
 CONFIG.GHOST_BOB_AMOUNT = 3
-CONFIG.CHEST_OPEN_DURATION = 0.3
-CONFIG.DOOR_OPEN_DURATION = 0.4
+CONFIG.CHEST_OPEN_DURATION = 0.28
+CONFIG.DOOR_OPEN_DURATION = 0.35
 CONFIG.PLAYER_IDLE_PULSE_SPEED = 2
 CONFIG.PLAYER_IDLE_PULSE_AMOUNT = 0.02
 
--- Audio settings
-CONFIG.MASTER_VOLUME = 0.7
-CONFIG.GHOST_AUDIO_MAX_DISTANCE = 300
-CONFIG.GHOST_AUDIO_MIN_DISTANCE = 50
-CONFIG.AMBIENT_BASE_VOLUME = 0.3
-CONFIG.POSITIONAL_AUDIO_ENABLED = true
+CONFIG.SANITY_MAX = 100
+CONFIG.SANITY_SAFE_DELAY = 4
+CONFIG.SANITY_PASSIVE_RECOVERY = 3
+CONFIG.SANITY_SHRINE_RECOVERY = 40
+CONFIG.SANITY_KEY_RECOVERY = 10
+CONFIG.SANITY_TONIC_RECOVERY = 28
+CONFIG.SANITY_WARD_RECOVERY = 18
+CONFIG.SANITY_DARK_ZONE_DRAIN = 6
+CONFIG.SANITY_CREEPING_DRAIN = 1.5
+CONFIG.SANITY_WAILER_DRAIN = 8
+CONFIG.SANITY_STALKER_DRAIN = 4
+CONFIG.SANITY_DETECTION_SPIKE = 20
+CONFIG.SANITY_PANIC_SPEED_MULTIPLIER = 0.8
+CONFIG.SANITY_PANIC_MONSTER_SPEED_MULTIPLIER = 1.18
+CONFIG.SANITY_LOW_THRESHOLD = 75
+CONFIG.SANITY_CRITICAL_THRESHOLD = 50
+CONFIG.SANITY_BREAK_THRESHOLD = 25
 
--- Combat settings
-CONFIG.COMBAT_ENABLED = true
-CONFIG.MONSTER_MAX_HEALTH = 3
-CONFIG.ATTACK_COOLDOWN = 1.0
-CONFIG.ATTACK_RANGE = 30
-CONFIG.ATTACK_ANIMATION_DURATION = 0.2
-CONFIG.DROP_CHANCE_KEY = 0.5  -- 50% chance to drop key
-CONFIG.DROP_CHANCE_ITEM = 0.3  -- 30% chance to drop item
+CONFIG.INVENTORY_SIZE = 3
 
--- Procedural generation settings
-CONFIG.PROCGEN_ENABLED = true
-CONFIG.PROCGEN_ALGORITHM = "bsp"  -- "bsp" or "cave"
-CONFIG.PROCGEN_MAX_DEPTH = 4  -- BSP recursion depth
-CONFIG.PROCGEN_MIN_ROOM_SIZE = 8
-CONFIG.PROCGEN_MAX_ROOM_SIZE = 15
-CONFIG.PROCGEN_CAVE_FILL_PERCENT = 45  -- for cellular automata
-CONFIG.PROCGEN_CAVE_SMOOTH_ITERATIONS = 5
-
--- Minimap settings
-CONFIG.MINIMAP_ENABLED = false
-CONFIG.MINIMAP_TOGGLE_KEY = "m"  -- Toggle minimap with M key
-CONFIG.MINIMAP_SIZE = 150  -- Size of minimap in pixels
-CONFIG.MINIMAP_POSITION_X = 10  -- X position (from left)
-CONFIG.MINIMAP_POSITION_Y = 120  -- Y position (from top, below HUD)
-CONFIG.MINIMAP_SCALE = 0.25  -- Scale factor for minimap
-CONFIG.MINIMAP_BACKGROUND_ALPHA = 0.7  -- Background transparency
-CONFIG.MINIMAP_SHOW_GHOSTS = true  -- Show ghosts on minimap
-CONFIG.MINIMAP_SHOW_ITEMS = true  -- Show items on minimap
-CONFIG.MINIMAP_SHOW_KEYS = true  -- Show keys on minimap
-
--- Daily Challenge Mode
-CONFIG.DAILY_CHALLENGE_ENABLED = false  -- Toggle daily challenge mode
-CONFIG.DAILY_CHALLENGE_SEED = nil  -- Will be set based on date
-CONFIG.USE_CUSTOM_SEED = false  -- For testing/replays
-CONFIG.CUSTOM_SEED = 12345  -- Custom seed value
-
--- Performance Profiling
-CONFIG.PROFILING_ENABLED = false  -- Toggle with F6
-CONFIG.PROFILING_HISTORY_SIZE = 60  -- Number of frames to track
-CONFIG.PROFILING_UPDATE_INTERVAL = 0.5  -- Update stats every 0.5s
-
--- Inventory System
-CONFIG.INVENTORY_ENABLED = true
-CONFIG.INVENTORY_SIZE = 3  -- Number of items player can hold
-CONFIG.INSTANT_USE_ITEMS = false  -- If true, items are used immediately on pickup
-
--- Accessibility Options
-CONFIG.ACCESSIBILITY_ENABLED = true
-CONFIG.COLORBLIND_MODE = "none"  -- "none", "protanopia", "deuteranopia", "tritanopia"
-CONFIG.HIGH_CONTRAST_MODE = false  -- Enhance contrast for visibility
-CONFIG.SLOW_MODE = false  -- Reduce all speeds by 50%
-CONFIG.SLOW_MODE_MULTIPLIER = 0.5
-CONFIG.VISUAL_AUDIO_INDICATORS = true  -- Show visual indicators for sound cues
-CONFIG.FONT_SIZE_MULTIPLIER = 1.0  -- Adjust font sizes (0.8 to 1.5)
-
--- Room Hazards
-CONFIG.HAZARDS_ENABLED = true
-CONFIG.SPIKE_DAMAGE = 20  -- Damage from spike traps
-CONFIG.SPIKE_COOLDOWN = 1.0  -- Time between spike activations (seconds)
-CONFIG.SPIKE_ACTIVE_TIME = 1.0  -- How long spikes stay active
-CONFIG.SPIKE_INACTIVE_TIME = 2.0  -- How long spikes stay inactive
-CONFIG.PRESSURE_PLATE_RADIUS = 10  -- Activation distance
-CONFIG.TIMED_ROOM_DURATION = 30  -- Time limit for timed rooms (seconds)
-CONFIG.TIMED_ROOM_WARNING_TIME = 10  -- When to start warning (seconds remaining)
-CONFIG.DARK_ZONE_VISION_MULTIPLIER = 0.5  -- Vision radius multiplier in dark zones
-
--- Time Attack Mode
-CONFIG.TIME_ATTACK_MODE = false  -- Toggle time attack mode
-CONFIG.TIME_ATTACK_PAR_TIMES = {  -- Par times in seconds for each difficulty
-    easy = 300,      -- 5 minutes
-    normal = 180,    -- 3 minutes
-    hard = 120,      -- 2 minutes
-    nightmare = 90   -- 1.5 minutes
-}
-CONFIG.TIME_ATTACK_SPEED_INCREASE_INTERVAL = 30  -- Increase speed every 30 seconds
-CONFIG.TIME_ATTACK_SPEED_INCREASE_AMOUNT = 5  -- Increase ghost speed by 5
-CONFIG.TIME_BONUS_PER_ITEM = 5  -- Bonus seconds for collecting items
+CONFIG.DEBUG_SHOW_COLLISION = false
+CONFIG.DEBUG_SHOW_AI = false
+CONFIG.DEBUG_SHOW_FPS = true
 
 return CONFIG

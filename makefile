@@ -1,10 +1,10 @@
 compiler := love
-VERSION := 2.5.0
+VERSION := $(shell cat VERSION)
 
 all: build
 
 build: src
-	clear && love src
+	$(compiler) src
 
 debug: src
 	(time love src) 2>&1 | tee test/log.txt
@@ -12,6 +12,11 @@ debug: src
 clean:
 	rm -f test/log.txt
 	rm -rf dist/
+
+syntax:
+	@for file in src/main.lua src/config.lua src/modules/*.lua test/test_runner.lua test/run_tests.lua test/spec/*.lua; do \
+		luac -p $$file || exit 1; \
+	done
 
 # Build distribution packages
 dist: clean-dist love-file
@@ -63,7 +68,7 @@ clean-dist:
 	rm -rf dist/
 
 # Run automated tests
-test:
+test: syntax
 	@echo "Running Tikrit test suite..."
 	@lua test/run_tests.lua
 
@@ -72,4 +77,4 @@ test-verbose:
 	@echo "Running Tikrit test suite (verbose)..."
 	@lua test/run_tests.lua -v
 
-.PHONY: all build debug clean dist love-file macos windows linux release clean-dist test test-verbose
+.PHONY: all build debug clean syntax dist love-file macos windows linux release clean-dist test test-verbose
