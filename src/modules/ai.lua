@@ -127,6 +127,7 @@ function AI.createMonster(spawn, baseSpeed)
             hesitate = 0,
         },
         lootBias = tuning.lootBias,
+        detectedPlayer = false,
         facing = {0, 1},
         bobScale = 1.0,
     }
@@ -157,8 +158,8 @@ local function updateChaser(monster, player, dt, walls)
     moveTowards(monster, player.coord, dt, monster.speed, walls)
 end
 
-local function updatePatrolWarden(monster, player, dt, walls)
-    if AI.canSeePlayer(monster, player.coord, walls) then
+local function updatePatrolWarden(monster, player, dt, walls, canSeePlayer)
+    if canSeePlayer then
         monster.state = "guard"
         moveTowards(monster, player.coord, dt, monster.speed, walls)
     else
@@ -221,15 +222,24 @@ function AI.updateMonsters(monsters, player, world, runtime, dt)
         tier = "stable",
         monsterSpeedMultiplier = 1.0,
     }
+    local summary = {
+        newDetections = 0,
+    }
 
     for _, monster in ipairs(monsters) do
         local effectiveSpeed = monster.speed * sanityEffects.monsterSpeedMultiplier
         monster.speed = effectiveSpeed
+        local canSeePlayer = AI.canSeePlayer(monster, player.coord, world.walls)
+
+        if canSeePlayer and not monster.detectedPlayer then
+            summary.newDetections = summary.newDetections + 1
+        end
+        monster.detectedPlayer = canSeePlayer
 
         if monster.type == "chaser" then
             updateChaser(monster, player, dt, world.walls)
         elseif monster.type == "patrol_warden" then
-            updatePatrolWarden(monster, player, dt, world.walls)
+            updatePatrolWarden(monster, player, dt, world.walls, canSeePlayer)
         elseif monster.type == "lurker" then
             updateLurker(monster, player, dt, world.walls)
         elseif monster.type == "wailer" then
@@ -242,6 +252,8 @@ function AI.updateMonsters(monsters, player, world, runtime, dt)
 
         monster.speed = effectiveSpeed / sanityEffects.monsterSpeedMultiplier
     end
+
+    return summary
 end
 
 function AI.getDrawStyle(monster)
