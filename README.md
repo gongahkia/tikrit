@@ -3,7 +3,7 @@
 
 # Tikrit
 
-Tiny survival-horror [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in [Lua](https://www.lua.org/) using Love2D.
+Tiny survival-horror [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in [Lua](https://www.lua.org/) using [Love2D](https://love2d.org/).
 
 ## Usage
 
@@ -15,6 +15,8 @@ $ ./build.sh
 $ make
 $ make test # optionally
 ```
+
+On macOS, `make` will also use `/Applications/love.app` or `~/Applications/love.app` automatically when the `love` binary is not on `PATH`.
 
 ## Screenshot
 

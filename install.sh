@@ -2,6 +2,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOVE_FINDER="$SCRIPT_DIR/scripts/find_love.sh"
+
 echo "Checking Tikrit prerequisites"
 echo "============================="
 
@@ -28,11 +31,11 @@ else
     echo "- Found: make"
 fi
 
-if ! command -v love >/dev/null 2>&1; then
-    echo "- Missing: Love2D"
-    missing=1
+love_binary="$("$LOVE_FINDER" 2>/dev/null || true)"
+if [ -z "$love_binary" ]; then
+    echo "- Warning: Love2D runtime not found"
 else
-    echo "- Found: Love2D"
+    echo "- Found: Love2D ($love_binary)"
 fi
 
 if [ "$missing" -ne 0 ]; then
@@ -43,7 +46,11 @@ fi
 
 echo ""
 echo "Running syntax checks and tests..."
-make test
+make -C "$SCRIPT_DIR" test
 
 echo ""
-echo "Tikrit is ready to run with: make"
+if [ -n "$love_binary" ]; then
+    echo "Tikrit is ready to run with: make"
+else
+    echo "Tests passed. Install Love2D or set LOVE_APP_PATH to run the game with: make"
+fi

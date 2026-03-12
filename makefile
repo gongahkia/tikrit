@@ -1,14 +1,22 @@
-compiler := love
 VERSION := $(shell cat VERSION)
 LOVE_APP_PATH ?= /Applications/love.app
+LOVE_BINARY ?= $(shell "$(CURDIR)/scripts/find_love.sh" 2>/dev/null || true)
 
 all: build
 
 build: src
-	$(compiler) src
+	@if [ -z "$(LOVE_BINARY)" ]; then \
+		echo "Love2D not found. Install it or set LOVE_APP_PATH to your love.app bundle."; \
+		exit 1; \
+	fi
+	"$(LOVE_BINARY)" src
 
 debug: src
-	(time love src) 2>&1 | tee test/log.txt
+	@if [ -z "$(LOVE_BINARY)" ]; then \
+		echo "Love2D not found. Install it or set LOVE_APP_PATH to your love.app bundle."; \
+		exit 1; \
+	fi
+	(time "$(LOVE_BINARY)" src) 2>&1 | tee test/log.txt
 
 clean:
 	rm -f test/log.txt
