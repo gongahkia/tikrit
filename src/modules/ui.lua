@@ -33,12 +33,35 @@ function UI.drawTitleScreen(state, fonts, settings)
     local footer = {
         "Up/Down selects, Left/Right changes values, Enter confirms",
         "Settings and progression are available from the title and pause screens",
+        "Replays can be saved from pause or result screens",
         "F5 opens the editor only when debug tools are enabled",
     }
 
     for index, line in ipairs(footer) do
         drawCenteredText(fonts.small, line, 470 + ((index - 1) * 24), settings, {0.55, 0.55, 0.55, 1})
     end
+end
+
+function UI.drawReplayScreen(screenState, fonts, settings)
+    drawCenteredText(fonts.large, "REPLAYS", 30, settings, {0.92, 0.92, 0.92, 1})
+
+    if #screenState.entries == 0 then
+        drawCenteredText(fonts.medium, "No saved replays", 240, settings, {0.72, 0.72, 0.72, 1})
+        drawCenteredText(fonts.small, "Save one from pause or after a run", 300, settings, {0.55, 0.55, 0.55, 1})
+    else
+        for index, entry in ipairs(screenState.entries) do
+            local y = 150 + ((index - 1) * 56)
+            local color = index == screenState.index and {1, 0.93, 0.35, 1} or {0.8, 0.8, 0.8, 1}
+            Accessibility.setColor(settings, color[1], color[2], color[3], color[4])
+            love.graphics.setFont(fonts.medium)
+            love.graphics.print(entry.file, 70, y)
+
+            love.graphics.setFont(fonts.small)
+            love.graphics.print(entry.details, 90, y + 28)
+        end
+    end
+
+    drawCenteredText(fonts.small, "Enter plays, R refreshes, Esc returns", 550, settings, {0.55, 0.55, 0.55, 1})
 end
 
 function UI.drawSettingsScreen(screenState, fonts, settings)
@@ -123,9 +146,10 @@ end
 
 function UI.drawHUD(run, fonts, settings)
     local player = run.world.player
+    local panelHeight = run.replayMode and 194 or 170
 
     Accessibility.setColor(settings, 0, 0, 0, 0.72)
-    love.graphics.rectangle("fill", 0, 0, 240, 170)
+    love.graphics.rectangle("fill", 0, 0, 240, panelHeight)
 
     Accessibility.setColor(settings, 1, 1, 1, 1)
     love.graphics.setFont(fonts.small)
@@ -157,6 +181,11 @@ function UI.drawHUD(run, fonts, settings)
 
     Accessibility.setColor(settings, 1, 1, 1, 1)
     love.graphics.print(string.format("%d", math.floor(player.sanity)), 220, 132)
+
+    if run.replayMode then
+        local progress = math.floor((run.replayProgress or 0) * 100)
+        love.graphics.print("Replay: " .. progress .. "%", 10, 156)
+    end
 end
 
 function UI.drawSanityOverlay(run, fonts, settings)
@@ -191,7 +220,8 @@ function UI.drawWinScreen(run, fonts, settings)
     drawCenteredText(fonts.medium, string.format("Time: %.1fs", run.stats.finishTime - run.stats.startTime), 200, settings, {0.72, 0.72, 0.72, 1})
     drawCenteredText(fonts.medium, string.format("Keys: %d", run.stats.keysCollected), 250, settings, {0.72, 0.72, 0.72, 1})
     drawCenteredText(fonts.medium, string.format("Sanity left: %d", math.floor(run.world.player.sanity)), 300, settings, {0.72, 0.72, 0.72, 1})
-    drawCenteredText(fonts.small, "Enter returns to title", 520, settings, {0.55, 0.55, 0.55, 1})
+    local prompt = run.replayMode and "Enter returns to title" or "S saves replay, Enter returns to title"
+    drawCenteredText(fonts.small, prompt, 520, settings, {0.55, 0.55, 0.55, 1})
 end
 
 function UI.drawLoseScreen(run, fonts, settings)
@@ -199,7 +229,8 @@ function UI.drawLoseScreen(run, fonts, settings)
     drawCenteredText(fonts.medium, string.format("Time: %.1fs", run.stats.finishTime - run.stats.startTime), 200, settings, {0.72, 0.72, 0.72, 1})
     drawCenteredText(fonts.medium, string.format("Deaths: %d", run.stats.deaths), 250, settings, {0.72, 0.72, 0.72, 1})
     drawCenteredText(fonts.medium, string.format("Sanity left: %d", math.floor(run.world.player.sanity)), 300, settings, {0.72, 0.72, 0.72, 1})
-    drawCenteredText(fonts.small, "Enter returns to title", 520, settings, {0.55, 0.55, 0.55, 1})
+    local prompt = run.replayMode and "Enter returns to title" or "S saves replay, Enter returns to title"
+    drawCenteredText(fonts.small, prompt, 520, settings, {0.55, 0.55, 0.55, 1})
 end
 
 function UI.drawMinimap(run, settings)
