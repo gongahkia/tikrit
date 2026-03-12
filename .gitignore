@@ -2,3 +2,8 @@
 .vscode
 a.out
 desktop.ini
+dist/
+editor_maps/
+progression.txt
+replays/
+settings.txt
