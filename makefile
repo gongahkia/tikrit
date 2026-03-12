@@ -1,5 +1,6 @@
 compiler := love
 VERSION := $(shell cat VERSION)
+LOVE_APP_PATH ?= /Applications/love.app
 
 all: build
 
@@ -19,7 +20,7 @@ syntax:
 	done
 
 # Build distribution packages
-dist: clean-dist love-file
+dist: clean-dist verify-love-file
 	@echo "Building distribution packages..."
 	mkdir -p dist
 
@@ -30,35 +31,51 @@ love-file:
 	cd src && zip -9 -r ../dist/tikrit-$(VERSION).love .
 	@echo "Created dist/tikrit-$(VERSION).love"
 
+verify-love-file: love-file
+	@echo "Verifying .love archive..."
+	unzip -tqq dist/tikrit-$(VERSION).love
+	@echo "Verified dist/tikrit-$(VERSION).love"
+
 # macOS .app bundle
 macos: love-file
 	@echo "Building macOS app..."
 	mkdir -p dist/macos
-	cp -r /Applications/love.app dist/macos/Tikrit.app 2>/dev/null || \
-		(echo "Error: love.app not found in /Applications. Please install Love2D first." && exit 1)
-	cat dist/macos/Tikrit.app/Contents/MacOS/love dist/tikrit-$(VERSION).love > dist/macos/Tikrit.app/Contents/MacOS/tikrit
-	chmod +x dist/macos/Tikrit.app/Contents/MacOS/tikrit
-	rm dist/macos/Tikrit.app/Contents/MacOS/love
-	# Update Info.plist
-	plutil -replace CFBundleName -string "Tikrit" dist/macos/Tikrit.app/Contents/Info.plist
-	plutil -replace CFBundleIdentifier -string "com.gongahkia.tikrit" dist/macos/Tikrit.app/Contents/Info.plist
-	plutil -replace CFBundleVersion -string "$(VERSION)" dist/macos/Tikrit.app/Contents/Info.plist
-	cd dist/macos && zip -9 -r ../tikrit-$(VERSION)-macos.zip Tikrit.app
+	if [ -d "$(LOVE_APP_PATH)" ]; then \
+		cp -r "$(LOVE_APP_PATH)" dist/macos/Tikrit.app; \
+		cat dist/macos/Tikrit.app/Contents/MacOS/love dist/tikrit-$(VERSION).love > dist/macos/Tikrit.app/Contents/MacOS/tikrit; \
+		chmod +x dist/macos/Tikrit.app/Contents/MacOS/tikrit; \
+		rm dist/macos/Tikrit.app/Contents/MacOS/love; \
+		plutil -replace CFBundleName -string "Tikrit" dist/macos/Tikrit.app/Contents/Info.plist; \
+		plutil -replace CFBundleIdentifier -string "com.gongahkia.tikrit" dist/macos/Tikrit.app/Contents/Info.plist; \
+		plutil -replace CFBundleVersion -string "$(VERSION)" dist/macos/Tikrit.app/Contents/Info.plist; \
+		cd dist/macos && zip -9 -r ../tikrit-$(VERSION)-macos.zip Tikrit.app; \
+	else \
+		cp dist/tikrit-$(VERSION).love dist/macos/; \
+		printf "Install Love2D for macOS, then run:\nlove tikrit-$(VERSION).love\n" > dist/macos/README.txt; \
+		cd dist/macos && zip -9 -r ../tikrit-$(VERSION)-macos.zip tikrit-$(VERSION).love README.txt; \
+	fi
 	@echo "Created dist/tikrit-$(VERSION)-macos.zip"
 
-# Windows .exe (requires love-release or manual bundling)
+# Windows portable package
 windows: love-file
-	@echo "Windows build requires love-release tool or manual bundling"
-	@echo "Install with: luarocks install love-release"
-	@echo "Then run: love-release -W -M dist/tikrit-$(VERSION).love"
+	@echo "Creating Windows portable package..."
+	mkdir -p dist/windows
+	cp dist/tikrit-$(VERSION).love dist/windows/
+	printf "Install Love2D for Windows, then open or run:\nlove tikrit-$(VERSION).love\n" > dist/windows/README.txt
+	cd dist/windows && zip -9 -r ../tikrit-$(VERSION)-windows.zip tikrit-$(VERSION).love README.txt
+	@echo "Created dist/tikrit-$(VERSION)-windows.zip"
 
-# Linux AppImage (simplified - just bundle .love with instructions)
+# Linux portable package
 linux: love-file
-	@echo "Linux distribution package created"
-	@echo "Users can run with: love dist/tikrit-$(VERSION).love"
+	@echo "Creating Linux portable package..."
+	mkdir -p dist/linux
+	cp dist/tikrit-$(VERSION).love dist/linux/
+	printf "Install Love2D for Linux, then run:\nlove tikrit-$(VERSION).love\n" > dist/linux/README.txt
+	cd dist/linux && zip -9 -r ../tikrit-$(VERSION)-linux.zip tikrit-$(VERSION).love README.txt
+	@echo "Created dist/tikrit-$(VERSION)-linux.zip"
 
 # Build all platforms
-release: love-file macos
+release: verify-love-file macos windows linux
 	@echo "Release build complete!"
 	@echo "Packages created in dist/"
 	@ls -lh dist/
@@ -77,4 +94,4 @@ test-verbose:
 	@echo "Running Tikrit test suite (verbose)..."
 	@lua test/run_tests.lua -v
 
-.PHONY: all build debug clean syntax dist love-file macos windows linux release clean-dist test test-verbose
+.PHONY: all build debug clean syntax dist love-file verify-love-file macos windows linux release clean-dist test test-verbose
