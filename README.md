@@ -10,8 +10,11 @@ Tiny survival-horror [roguelike](https://en.wikipedia.org/wiki/Roguelike) writte
 This branch uses a procgen-only game flow with:
 
 - typed enemy archetypes
+- runtime hazards (spikes and cursed rooms)
 - a persisted settings screen
+- replay save and playback support
 - a sanity system tied to dark zones, safe rooms, and enemy pressure
+- a headless smoke test that exercises the supported runtime flow
 
 ## Installation
 
@@ -29,6 +32,8 @@ $ make
 $ make test
 ```
 
+This runs the Lua unit suite plus a headless runtime smoke test. It does not require a graphical Love2D install.
+
 ### Build
 
 ```console
@@ -36,6 +41,8 @@ $ ./build.sh
 ```
 
 This produces `dist/tikrit-<version>.love`.
+
+The `.love` package is the validated build artifact in this repo. Native `macos`, `windows`, and `linux` packaging targets still depend on local Love2D runtime assets being available on the machine that builds them.
 
 ## Assets
 
