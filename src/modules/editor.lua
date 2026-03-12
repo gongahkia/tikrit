@@ -12,6 +12,7 @@ local state = {
   mouseGridX = 0,
   mouseGridY = 0,
   camera = {x = 0, y = 0},
+  zoom = 1,
   map = {},
   mapWidth = 30,
   mapHeight = 20,
@@ -52,6 +53,7 @@ function Editor.init()
   Editor.createEmptyMap()
   state.history = {}
   state.historyIndex = 0
+  state.zoom = 1
 end
 
 -- Create empty map
@@ -145,8 +147,8 @@ function Editor.update(dt)
   
   -- Get mouse position
   local mouseX, mouseY = love.mouse.getPosition()
-  state.mouseGridX = math.floor((mouseX - state.camera.x) / state.gridSize)
-  state.mouseGridY = math.floor((mouseY - state.camera.y) / state.gridSize)
+  state.mouseGridX = math.floor((mouseX - state.camera.x) / (state.gridSize * state.zoom))
+  state.mouseGridY = math.floor((mouseY - state.camera.y) / (state.gridSize * state.zoom))
   
   -- Handle mouse painting
   if love.mouse.isDown(1) then  -- Left click
@@ -169,6 +171,13 @@ function Editor.update(dt)
   if love.keyboard.isDown("s") then
     state.camera.y = state.camera.y - moveSpeed
   end
+end
+
+function Editor.wheelmoved(x, y)
+  if not state.active or y == 0 then return end
+
+  local nextZoom = state.zoom + (y * 0.1)
+  state.zoom = math.max(0.5, math.min(2.5, nextZoom))
 end
 
 -- Place tile
@@ -358,6 +367,7 @@ function Editor.draw()
   
   love.graphics.push()
   love.graphics.translate(state.camera.x, state.camera.y)
+  love.graphics.scale(state.zoom, state.zoom)
   
   -- Draw map tiles
   for y = 0, state.mapHeight - 1 do
@@ -428,7 +438,8 @@ function Editor.drawUI()
   love.graphics.print("LEVEL EDITOR", 10, 10)
   love.graphics.print("Current Tool: " .. state.currentTool .. " (" .. Editor.TOOLS[state.currentTool].name .. ")", 10, 30)
   love.graphics.print("Grid: " .. state.mouseGridX .. ", " .. state.mouseGridY, 10, 50)
-  love.graphics.print("Press H for help", 10, 70)
+  love.graphics.print(string.format("Zoom: %.1fx", state.zoom), 10, 70)
+  love.graphics.print("Press H for help", 10, 90)
   
   -- Tool palette
   local paletteX = 10
@@ -462,7 +473,7 @@ LEVEL EDITOR CONTROLS
 Mouse:
   Left Click: Place current tool
   Right Click: Erase (place empty)
-  Scroll: Zoom (not implemented)
+  Scroll: Zoom
 
 Movement:
   WASD: Pan camera
