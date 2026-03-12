@@ -31,7 +31,7 @@ describe("AI", function()
         local stalker = AI.createMonster({type = "stalker", coord = {20, 80}}, 40)
         local lurker = AI.createMonster({type = "lurker", coord = {100, 100}}, 40)
 
-        AI.updateMonsters({chaser, stalker, lurker}, player, world, {
+        local summary = AI.updateMonsters({chaser, stalker, lurker}, player, world, {
             sanityEffects = {
                 tier = "broken",
                 monsterSpeedMultiplier = 1.0,
@@ -41,5 +41,6 @@ describe("AI", function()
         TestRunner.assertTrue(chaser.coord[1] > 20)
         TestRunner.assertEqual(stalker.state, "pressing")
         TestRunner.assertTrue(lurker.state == "burst" or lurker.state == "rest")
+        TestRunner.assertTrue(summary.newDetections >= 1)
     end)
 end)
