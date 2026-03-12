@@ -219,6 +219,10 @@ function ProcGen.generateRunData(difficultyName)
     local darkZones = {}
     local safeZones = {}
     local shrines = {}
+    local hazards = {
+        spikes = {},
+        cursedZones = {},
+    }
 
     local startRoom = cloneRoom(rooms[1])
     local recoveryRoom = cloneRoom(rooms[math.min(#rooms, 2)])
@@ -237,6 +241,13 @@ function ProcGen.generateRunData(difficultyName)
 
     for index = 1, math.min(CONFIG.PROCGEN_DARK_ZONE_COUNT, #candidateRooms) do
         table.insert(darkZones, makeZone(candidateRooms[index], 0))
+    end
+
+    for index = 1, math.min(CONFIG.PROCGEN_CURSED_ROOM_COUNT, math.max(0, #candidateRooms - CONFIG.PROCGEN_DARK_ZONE_COUNT)) do
+        local room = candidateRooms[CONFIG.PROCGEN_DARK_ZONE_COUNT + index]
+        if room then
+            table.insert(hazards.cursedZones, makeZone(room, 0))
+        end
     end
 
     for _ = 1, difficulty.keyCount do
@@ -259,6 +270,28 @@ function ProcGen.generateRunData(difficultyName)
                 kind = "speed_tonic"
             end
             table.insert(items, {coord = toWorld(tile), kind = kind})
+        end
+    end
+
+    local spikeCount = Utils.clamp(
+        math.floor((difficulty.spawnBudget * CONFIG.PROCGEN_SPIKE_MULTIPLIER) + 0.5),
+        CONFIG.PROCGEN_SPIKE_MIN,
+        CONFIG.PROCGEN_SPIKE_MAX
+    )
+
+    for index = 1, spikeCount do
+        local room = candidateRooms[((index + CONFIG.PROCGEN_DARK_ZONE_COUNT + CONFIG.PROCGEN_CURSED_ROOM_COUNT - 1)
+            % math.max(#candidateRooms, 1)) + 1]
+        if room then
+            local tile = chooseTile(room, used)
+            if tile then
+                table.insert(hazards.spikes, {
+                    coord = toWorld(tile),
+                    timer = (index - 1) * 0.25,
+                    active = false,
+                    hitCooldown = 0,
+                })
+            end
         end
     end
 
@@ -303,6 +336,7 @@ function ProcGen.generateRunData(difficultyName)
         safeZones = safeZones,
         darkZones = darkZones,
         shrines = shrines,
+        hazards = hazards,
         floorVariants = floorVariants,
         wallVariants = wallVariants,
     }
