@@ -25,6 +25,6 @@ $ make test
 * Sprites from Kenney's [tiny dungeon asset pack](https://kenney.nl/assets/tiny-dungeon) 
 * Audio from [OpenGameArt](https://opengameart.org/)
 
-## Reference
+## What?
 
 ![](asset/logo/tikrit-origin.png)
