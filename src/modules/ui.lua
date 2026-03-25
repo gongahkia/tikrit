@@ -21,6 +21,10 @@ local EQUIPMENT_ICON_KEYS = {
     flare = "loot",
 }
 
+local PANEL_HEIGHT = 74
+local PANEL_GAP = 8
+local PANEL_Y = 8
+
 local function drawCentered(font, text, y, settings, color)
     Accessibility.setColor(settings, color[1], color[2], color[3], color[4] or 1)
     love.graphics.setFont(font)
@@ -52,12 +56,36 @@ local function modeLabel(run)
     return string.upper(run.mode or "survival")
 end
 
-local function drawIcon(image, x, y, settings, alpha)
+local function fontWidth(font, text)
+    if font and font.getWidth then
+        return font:getWidth(text)
+    end
+    return #tostring(text) * 8
+end
+
+local function fitText(font, text, maxWidth)
+    text = tostring(text or "")
+    if fontWidth(font, text) <= maxWidth then
+        return text
+    end
+
+    local clipped = text
+    while #clipped > 3 and fontWidth(font, clipped .. "...") > maxWidth do
+        clipped = clipped:sub(1, -2)
+    end
+    return clipped .. "..."
+end
+
+local function drawIcon(image, x, y, settings, alpha, targetSize)
     if not image or not love.graphics.draw then
         return false
     end
+    targetSize = targetSize or 12
+    local width = image.getWidth and image:getWidth() or 20
+    local height = image.getHeight and image:getHeight() or 20
+    local scale = math.min(targetSize / math.max(1, width), targetSize / math.max(1, height))
     Accessibility.setColor(settings, 1, 1, 1, alpha or 1)
-    love.graphics.draw(image, x, y)
+    love.graphics.draw(image, x, y, 0, scale, scale)
     return true
 end
 
@@ -84,15 +112,58 @@ local function appendConditionMarker(item)
     return ""
 end
 
-local function drawLevelPips(level, x, y, settings)
+local function drawLevelPips(level, x, y, settings, size, gap)
     if not love.graphics.rectangle then
         return
     end
+    size = size or 6
+    gap = gap or (size + 2)
     for index = 1, CONFIG.SKILL_LEVEL_CAP do
         local filled = index <= level
         Accessibility.setColor(settings, filled and 1 or 0.36, filled and 0.9 or 0.36, filled and 0.32 or 0.4, 1)
-        love.graphics.rectangle(filled and "fill" or "line", x + ((index - 1) * 8), y, 6, 6)
+        love.graphics.rectangle(filled and "fill" or "line", x + ((index - 1) * gap), y, size, size)
     end
+end
+
+local function drawPanel(x, y, width, height, settings)
+    Accessibility.setColor(settings, 0.03, 0.06, 0.08, 0.66)
+    love.graphics.rectangle("fill", x, y, width, height)
+    Accessibility.setColor(settings, 0.28, 0.34, 0.4, 0.8)
+    love.graphics.rectangle("line", x, y, width, height)
+end
+
+local function inventorySummary(inventory)
+    local compactLabels = {
+        ["Raw Meat"] = "Meat",
+        ["Cooked Meat"] = "Cooked",
+        ["Raw Fish"] = "Fish",
+        ["Cooked Fish"] = "Cooked Fish",
+        ["Canned Food"] = "Canned",
+        ["Fishing Tackle"] = "Tackle",
+        ["Rabbit Pelt"] = "Pelt",
+        ["Fresh Gut"] = "Gut",
+    }
+    local parts = {}
+    for index, item in ipairs(inventory or {}) do
+        local label = compactLabels[Items.describe(item.kind)] or Items.describe(item.kind)
+        if (item.quantity or 1) > 1 then
+            label = string.format("%s x%d", label, item.quantity)
+        end
+        parts[#parts + 1] = string.format("%d:%s%s", index, label, appendConditionMarker(item))
+        if #parts >= 3 then
+            break
+        end
+    end
+    return #parts > 0 and table.concat(parts, "  ") or "empty"
+end
+
+local function skillSummary(skills, keys)
+    local parts = {}
+    for _, key in ipairs(keys) do
+        local level = ((skills[key] or {}).level) or 1
+        parts[#parts + 1] = string.format("%s%d", key:sub(1, 1), level)
+    end
+    return table.concat(parts, "  ")
 end
 
 function UI.drawTitleScreen(state, fonts, settings)
@@ -192,11 +263,19 @@ function UI.drawPauseScreen(options, selectedIndex, fonts, settings)
 end
 
 function UI.drawHUD(run, fonts, settings, sprites)
-    Accessibility.setColor(settings, 0.03, 0.06, 0.08, 0.82)
-    love.graphics.rectangle("fill", 0, 0, CONFIG.WINDOW_WIDTH, 164)
-
     local player = run.player
+    local world = run.world or {}
+    local runtime = run.runtime or {}
+    local gameplay = settings.gameplay or {}
     local itemSprites = sprites and sprites.items or {}
+    local skillIcons = itemSprites.skills or {}
+    local hudFont = fonts.hud or fonts.small
+    local tinyFont = fonts.tiny or fonts.small
+    local panelWidth = math.floor((CONFIG.WINDOW_WIDTH - (PANEL_GAP * 4)) / 3)
+    local panelOneX = PANEL_GAP
+    local panelTwoX = panelOneX + panelWidth + PANEL_GAP
+    local panelThreeX = panelTwoX + panelWidth + PANEL_GAP
+    local panelThreeWidth = CONFIG.WINDOW_WIDTH - panelThreeX - PANEL_GAP
     local afflictionsState = player.afflictions or {
         hypothermia = false,
         hypothermiaRisk = 0,
@@ -213,61 +292,65 @@ function UI.drawHUD(run, fonts, settings, sprites)
         Mending = {level = 1},
         Archery = {level = 1},
     }
-    local weatherText = string.format("%s  Day %d  %02d:%02d  %s",
+    local weatherText = string.format("%s  D%d  %02d:%02d  %s",
         modeLabel(run),
-        run.world.dayCount,
-        math.floor(run.world.timeOfDay),
-        math.floor((run.world.timeOfDay % 1) * 60),
-        string.upper(run.world.weather.current)
+        world.dayCount or 1,
+        math.floor(world.timeOfDay or 0),
+        math.floor(((world.timeOfDay or 0) % 1) * 60),
+        string.upper((((world.weather or {}).current or "clear"):sub(1, 3)))
+    )
+    local stationText = nil
+    if runtime.currentStation and runtime.currentStation.label then
+        local stationName = runtime.currentStation.label
+        if stationName == "Workbench / Curing Rack" then
+            stationName = "Bench/Cure"
+        elseif stationName == "Curing Rack" then
+            stationName = "Cure"
+        end
+        stationText = string.format("Stn %s %s", stationName, runtime.currentStation.state or "idle")
+    end
+
+    drawPanel(panelOneX, PANEL_Y, panelWidth, PANEL_HEIGHT, settings)
+    drawPanel(panelTwoX, PANEL_Y, panelWidth, PANEL_HEIGHT, settings)
+    drawPanel(panelThreeX, PANEL_Y, panelThreeWidth, PANEL_HEIGHT, settings)
+
+    Accessibility.setColor(settings, 0.9, 0.95, 1, 1)
+    love.graphics.setFont(hudFont)
+    love.graphics.print(fitText(hudFont, weatherText, panelWidth - 16), panelOneX + 8, PANEL_Y + 6)
+    if runtime.currentPOI then
+        Accessibility.setColor(settings, 0.75, 0.86, 0.96, 1)
+        love.graphics.print(fitText(tinyFont, "POI " .. runtime.currentPOI, panelWidth - 16), panelOneX + 8, PANEL_Y + 22)
+    end
+    if stationText then
+        Accessibility.setColor(settings, 0.7, 0.84, 0.9, 1)
+        love.graphics.print(
+            fitText(tinyFont, stationText, panelWidth - 16),
+            panelOneX + 8,
+            PANEL_Y + 34
+        )
+    end
+
+    Accessibility.setColor(settings, 0.9, 0.95, 1, 1)
+    love.graphics.print(
+        fitText(tinyFont, string.format("Condition %s  Warmth %s", formatPercent((player.condition / player.maxCondition) * 100), formatPercent(player.warmth)), panelWidth - 16),
+        panelOneX + 8,
+        PANEL_Y + 48
+    )
+    love.graphics.print(
+        fitText(tinyFont, string.format("Fatigue %s  Thirst %s", formatPercent(player.fatigue), formatPercent(player.thirst)), panelWidth - 16),
+        panelOneX + 8,
+        PANEL_Y + 60
     )
 
     Accessibility.setColor(settings, 0.9, 0.95, 1, 1)
-    love.graphics.setFont(fonts.small)
-    love.graphics.print(weatherText, 12, 10)
-    if run.runtime.currentPOI then
-        Accessibility.setColor(settings, 0.75, 0.86, 0.96, 1)
-        love.graphics.print("POI " .. run.runtime.currentPOI, 390, 10)
-        Accessibility.setColor(settings, 0.9, 0.95, 1, 1)
-    end
-    if run.runtime.currentStation and run.runtime.currentStation.label then
-        Accessibility.setColor(settings, 0.7, 0.84, 0.9, 1)
-        love.graphics.print(string.format("Station %s (%s)", run.runtime.currentStation.label, run.runtime.currentStation.state or "idle"), 390, 22)
-        Accessibility.setColor(settings, 0.9, 0.95, 1, 1)
-    end
-    love.graphics.print(string.format("Condition %s", formatPercent((player.condition / player.maxCondition) * 100)), 12, 34)
-    love.graphics.print(string.format("Warmth %s", formatPercent(player.warmth)), 12, 56)
-    love.graphics.print(string.format("Fatigue %s", formatPercent(player.fatigue)), 150, 34)
-    love.graphics.print(string.format("Thirst %s", formatPercent(player.thirst)), 150, 56)
-    love.graphics.print(string.format("Calories %d", math.floor(player.calories)), 280, 34)
-    love.graphics.print(string.format("Carry %.1f / %.1f", player.carryWeight, player.carryCapacity), 280, 56)
-    love.graphics.print(string.format("Fire lit %d", run.stats.firesLit), 460, 34)
-    love.graphics.print(string.format("Repelled %d", run.stats.wolvesRepelled), 460, 56)
-    local equipmentX = 280
-    local equipmentY = 78
-    local function drawEquipment(kind, label)
-        local iconKey = EQUIPMENT_ICON_KEYS[kind]
-        if iconKey then
-            drawIcon(itemSprites[iconKey] or itemSprites.loot, equipmentX, equipmentY, settings, 0.95)
-        end
-        Accessibility.setColor(settings, 0.86, 0.9, 0.96, 1)
-        love.graphics.print(string.format("%s %s", label, kind or "-"), equipmentX + 22, equipmentY + 2)
-        equipmentX = equipmentX + 96
-    end
-    drawEquipment(player.equippedTool, "Tool")
-    drawEquipment(player.equippedWeapon, "Weapon")
-    drawEquipment(player.equippedLight, "Light")
+    love.graphics.setFont(hudFont)
+    love.graphics.print(fitText(hudFont, string.format("Calories %d", math.floor(player.calories)), panelWidth - 16), panelTwoX + 8, PANEL_Y + 6)
+    love.graphics.print(fitText(hudFont, string.format("Carry %.1f / %.1f", player.carryWeight, player.carryCapacity), panelWidth - 16), panelTwoX + 8, PANEL_Y + 24)
+    love.graphics.print(fitText(tinyFont, string.format("Fire %d  Repelled %d", run.stats.firesLit, run.stats.wolvesRepelled), panelWidth - 16), panelTwoX + 8, PANEL_Y + 42)
 
-    love.graphics.print("Inventory", 12, 84)
-    local inventoryText = {}
-    for index, item in ipairs(player.inventory) do
-        local segment = string.format("%d:%s x%d", index, Items.describe(item.kind), item.quantity or 1)
-        segment = segment .. appendConditionMarker(item)
-        table.insert(inventoryText, segment)
-        if #inventoryText >= 6 then
-            break
-        end
-    end
-    love.graphics.print(table.concat(inventoryText, "  "), 90, 84)
+    love.graphics.setFont(tinyFont)
+    local inventoryText = inventorySummary(player.inventory)
+    love.graphics.print(fitText(tinyFont, "Inv " .. inventoryText, panelWidth - 16), panelTwoX + 8, PANEL_Y + 58)
 
     local afflictions = {}
     if afflictionsState.hypothermia then
@@ -292,50 +375,89 @@ function UI.drawHUD(run, fonts, settings, sprites)
     if (afflictionsState.foodPoisoningHours or 0) > 0 then
         table.insert(afflictions, {label = "Food Poisoning", icon = itemSprites.affliction and itemSprites.affliction.food_poisoning})
     end
-    love.graphics.print("Afflictions", 12, 108)
-    if #afflictions > 0 then
-        local afflictionX = 90
+
+    Accessibility.setColor(settings, 0.9, 0.95, 1, 1)
+    love.graphics.setFont(tinyFont)
+    local equipmentY = PANEL_Y + 8
+    local equipmentWidth = math.floor((panelThreeWidth - 24) / 3)
+    local function drawEquipment(kind, x, maxWidth)
+        local iconKey = EQUIPMENT_ICON_KEYS[kind]
+        if iconKey then
+            drawIcon(itemSprites[iconKey] or itemSprites.loot, x, equipmentY, settings, 0.95, 10)
+        end
+        Accessibility.setColor(settings, 0.86, 0.9, 0.96, 1)
+        love.graphics.print(fitText(tinyFont, kind and Items.describe(kind) or "-", maxWidth - 14), x + 14, equipmentY)
+    end
+    drawEquipment(player.equippedTool, panelThreeX + 8, equipmentWidth)
+    drawEquipment(player.equippedWeapon, panelThreeX + 8 + equipmentWidth, equipmentWidth)
+    drawEquipment(player.equippedLight, panelThreeX + 8 + (equipmentWidth * 2), equipmentWidth)
+
+    love.graphics.setFont(tinyFont)
+    local afflictionText = #afflictions > 0 and table.concat((function()
+        local labels = {}
         for _, affliction in ipairs(afflictions) do
-            drawIcon(affliction.icon, afflictionX, 106, settings, 0.95)
-            love.graphics.print(affliction.label, afflictionX + 22, 108)
-            afflictionX = afflictionX + 22 + fonts.small:getWidth(affliction.label) + 16
+            labels[#labels + 1] = affliction.label
         end
-    else
-        love.graphics.print("None", 90, 108)
+        return labels
+    end)(), ", ") or "none"
+    if #afflictions > 0 then
+        drawIcon(afflictions[1].icon, panelThreeX + 8, PANEL_Y + 28, settings, 0.95, 10)
+    end
+    Accessibility.setColor(settings, 0.84, 0.88, 0.94, 1)
+    love.graphics.print(fitText(tinyFont, "Aff " .. afflictionText, panelThreeWidth - 22), panelThreeX + 22, PANEL_Y + 26)
+
+    local skillOrder = {
+        {"FireStarting", panelThreeX + 8, PANEL_Y + 48},
+        {"Cooking", panelThreeX + 68, PANEL_Y + 48},
+        {"Fishing", panelThreeX + 128, PANEL_Y + 48},
+        {"Harvesting", panelThreeX + 8, PANEL_Y + 61},
+        {"Mending", panelThreeX + 68, PANEL_Y + 61},
+        {"Archery", panelThreeX + 128, PANEL_Y + 61},
+    }
+    for _, entry in ipairs(skillOrder) do
+        local key = entry[1]
+        local x = entry[2]
+        local y = entry[3]
+        local icon = skillIcons[SKILL_ICON_KEYS[key]]
+        if not drawIcon(icon, x, y, settings, 0.95, 8) then
+            Accessibility.setColor(settings, 0.84, 0.88, 0.94, 1)
+            love.graphics.print(key:sub(1, 2), x, y - 1)
+        end
+        drawLevelPips(((skills[key] or {}).level) or 1, x + 10, y + 2, settings, 3, 4)
     end
 
-    local skillX = 280
-    local skillY = 106
-    for _, key in ipairs(CONFIG.SKILL_NAMES) do
-        local iconKey = SKILL_ICON_KEYS[key]
-        local icon = iconKey and itemSprites.skills and itemSprites.skills[iconKey] or nil
-        local level = ((skills[key] or {}).level) or 1
-        if icon and drawIcon(icon, skillX, skillY, settings, 0.95) then
-            drawLevelPips(level, skillX + 24, skillY + 6, settings)
-            love.graphics.print(string.format("%s %d", key, level), skillX + 24, skillY - 10)
-        else
-            love.graphics.print(string.format("%s %d", key, level), skillX, skillY)
-        end
-        skillX = skillX + 96
-        if skillX > 520 then
-            skillX = 280
-            skillY = skillY + 20
-        end
-    end
-
-    if settings.gameplay.showHints and run.runtime.interactionHint ~= "" then
+    if gameplay.showHints and (runtime.interactionHint or "") ~= "" then
+        local hintText = fitText(hudFont, runtime.interactionHint, CONFIG.WINDOW_WIDTH - 120)
+        local hintWidth = fontWidth(hudFont, hintText) + 20
+        local hintX = (CONFIG.WINDOW_WIDTH - hintWidth) / 2
+        local hintY = PANEL_Y + PANEL_HEIGHT + 8
+        Accessibility.setColor(settings, 0.03, 0.06, 0.08, 0.7)
+        love.graphics.rectangle("fill", hintX, hintY, hintWidth, 20)
         Accessibility.setColor(settings, 0.74, 0.82, 0.9, 1)
-        love.graphics.print(run.runtime.interactionHint, 12, 146)
+        love.graphics.setFont(hudFont)
+        love.graphics.print(hintText, hintX + 10, hintY + 2)
     end
 
-    if run.runtime.discoveryToastTimer and run.runtime.discoveryToastTimer > 0 and run.runtime.discoveryToast ~= "" then
+    if runtime.discoveryToastTimer and runtime.discoveryToastTimer > 0 and (runtime.discoveryToast or "") ~= "" then
+        local toastText = fitText(hudFont, "Discovered " .. runtime.discoveryToast, 220)
+        local toastWidth = fontWidth(hudFont, toastText) + 20
+        local toastX = CONFIG.WINDOW_WIDTH - toastWidth - 12
+        local toastY = PANEL_Y + PANEL_HEIGHT + 8
+        Accessibility.setColor(settings, 0.14, 0.12, 0.04, 0.8)
+        love.graphics.rectangle("fill", toastX, toastY, toastWidth, 20)
         Accessibility.setColor(settings, 1, 0.93, 0.44, 1)
-        love.graphics.print("Discovered " .. run.runtime.discoveryToast, 390, 146)
+        love.graphics.setFont(hudFont)
+        love.graphics.print(toastText, toastX + 10, toastY + 2)
     end
 
-    if run.runtime.message ~= "" then
+    if (runtime.message or "") ~= "" then
+        local messageText = fitText(hudFont, runtime.message, CONFIG.WINDOW_WIDTH - 40)
+        local messageWidth = fontWidth(hudFont, messageText) + 20
+        Accessibility.setColor(settings, 0.03, 0.06, 0.08, 0.78)
+        love.graphics.rectangle("fill", 12, CONFIG.WINDOW_HEIGHT - 28, messageWidth, 18)
         Accessibility.setColor(settings, 1, 0.93, 0.44, 1)
-        love.graphics.print(run.runtime.message, 12, CONFIG.WINDOW_HEIGHT - 26)
+        love.graphics.setFont(hudFont)
+        love.graphics.print(messageText, 22, CONFIG.WINDOW_HEIGHT - 27)
     end
 end
 
