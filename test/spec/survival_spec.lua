@@ -111,4 +111,14 @@ describe("Survival", function()
         TestRunner.assertEqual(Items.count(run.player.inventory, "cloth"), clothBefore - 1)
         TestRunner.assertEqual(Items.count(run.player.inventory, "sewing_kit"), sewingBefore - 1)
     end)
+
+    it("accepts legacy temperature-band zones that use w/h instead of width/height", function()
+        local run = buildRun("snow", "clear")
+        run.world.temperatureBands = {
+            {zone = {x = 1, y = 1, w = 3, h = 3}, modifier = 8},
+        }
+        run.player.warmth = 40
+        Survival.update(run, 1.0, {})
+        TestRunner.assertTrue(run.player.warmth > 30)
+    end)
 end)
