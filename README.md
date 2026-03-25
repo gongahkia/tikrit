@@ -3,7 +3,7 @@
 
 # `Tikrit`
 
-Tiny survival [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in [Lua](https://www.lua.org/) using [Love2D](https://love2d.org/).
+Tiny survival [roguelike](https://en.wikipedia.org/wiki/Roguelike) written in [Lua](https://www.lua.org/) using [Löve2D](https://love2d.org/).
 
 ## Usage
 
