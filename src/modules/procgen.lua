@@ -1,345 +1,802 @@
 local CONFIG = require("config")
+local Items = require("modules/items")
 local Utils = require("modules/utils")
 
 local ProcGen = {}
 
-local function cloneRoom(room)
-    return {x = room.x, y = room.y, w = room.w, h = room.h}
-end
-
-function ProcGen.generateRoomLayout(width, height)
+local function newGrid()
     local grid = {}
-    for y = 1, height do
+    for y = 1, CONFIG.GRID_HEIGHT do
         grid[y] = {}
-        for x = 1, width do
-            grid[y][x] = 1
+        for x = 1, CONFIG.GRID_WIDTH do
+            grid[y][x] = "snow"
+        end
+    end
+    return grid
+end
+
+local function inBounds(x, y)
+    return x >= 1 and x <= CONFIG.GRID_WIDTH and y >= 1 and y <= CONFIG.GRID_HEIGHT
+end
+
+local function setTile(grid, x, y, tile)
+    if inBounds(x, y) then
+        grid[y][x] = tile
+    end
+end
+
+local function fillRect(grid, x, y, w, h, tile)
+    for gy = y, y + h - 1 do
+        for gx = x, x + w - 1 do
+            setTile(grid, gx, gy, tile)
+        end
+    end
+end
+
+local function carvePath(grid, x1, y1, x2, y2)
+    local x = x1
+    local y = y1
+    while x ~= x2 do
+        setTile(grid, x, y, "path")
+        x = x + (x2 > x and 1 or -1)
+    end
+    while y ~= y2 do
+        setTile(grid, x, y, "path")
+        y = y + (y2 > y and 1 or -1)
+    end
+    setTile(grid, x, y, "path")
+end
+
+local function buildBorder(grid)
+    for x = 1, CONFIG.GRID_WIDTH do
+        setTile(grid, x, 1, x % 2 == 0 and "rock" or "tree")
+        setTile(grid, x, CONFIG.GRID_HEIGHT, x % 2 == 0 and "tree" or "rock")
+    end
+    for y = 1, CONFIG.GRID_HEIGHT do
+        setTile(grid, 1, y, y % 2 == 0 and "rock" or "tree")
+        setTile(grid, CONFIG.GRID_WIDTH, y, y % 2 == 0 and "tree" or "rock")
+    end
+end
+
+local function worldCoord(gridX, gridY)
+    return {(gridX - 1) * CONFIG.TILE_SIZE, (gridY - 1) * CONFIG.TILE_SIZE}
+end
+
+local function zoneCenter(zone)
+    return {
+        (zone.x + math.floor(zone.width / 2)) * CONFIG.TILE_SIZE,
+        (zone.y + math.floor(zone.height / 2)) * CONFIG.TILE_SIZE,
+    }
+end
+
+local function makeZone(x, y, width, height)
+    return {x = x, y = y, width = width, height = height}
+end
+
+local function addCabin(grid, x, y, name, w, h)
+    w = math.max(6, w or 6)
+    h = math.max(5, h or 5)
+    for gy = y, y + h - 1 do
+        for gx = x, x + w - 1 do
+            local border = gy == y or gy == y + h - 1 or gx == x or gx == x + w - 1
+            setTile(grid, gx, gy, border and "cabin_wall" or "cabin_floor")
         end
     end
 
-    local rooms = {}
+    local doorX = x + math.floor(w / 2)
+    local doorY = y + h - 1
+    local bedX = x + 1
+    local bedY = y + 1
+    local stoveX = x + w - 2
+    local stoveY = y + 1
+    local workbenchX = x + 1
+    local workbenchY = y + h - 2
 
-    local function carveRoom(roomX, roomY, roomW, roomH)
-        for y = roomY, roomY + roomH - 1 do
-            for x = roomX, roomX + roomW - 1 do
-                if y > 1 and y < height and x > 1 and x < width then
-                    grid[y][x] = 0
-                end
+    setTile(grid, doorX, doorY, "path")
+    setTile(grid, bedX, bedY, "cabin_bed")
+    setTile(grid, stoveX, stoveY, "cabin_stove")
+    setTile(grid, workbenchX, workbenchY, "cabin_workbench")
+
+    return {
+        type = "cabin",
+        name = name or "Cabin",
+        x = x,
+        y = y,
+        w = w,
+        h = h,
+        door = {x = doorX, y = doorY},
+        bed = {x = bedX, y = bedY},
+        stove = {x = stoveX, y = stoveY},
+        workbench = {x = workbenchX, y = workbenchY},
+        doorOpen = false,
+    }
+end
+
+local function addCave(grid, x, y, w, h)
+    w = math.max(7, w or 7)
+    h = math.max(5, h or 5)
+    for gy = y, y + h - 1 do
+        for gx = x, x + w - 1 do
+            local border = gy == y or gy == y + h - 1 or gx == x or gx == x + w - 1
+            setTile(grid, gx, gy, border and "cave_wall" or "cave_floor")
+        end
+    end
+
+    local mouthX = x + math.floor(w / 2)
+    local mouthY = y + h - 1
+    local bedX = x + math.max(1, math.floor(w / 2) - 1)
+    local bedY = y + math.max(1, math.floor(h / 2))
+
+    setTile(grid, mouthX, mouthY, "path")
+
+    return {
+        type = "cave",
+        x = x,
+        y = y,
+        w = w,
+        h = h,
+        mouth = {x = mouthX, y = mouthY},
+        bed = {x = bedX, y = bedY},
+    }
+end
+
+local function canPlaceResource(grid, x, y)
+    local tile = grid[y] and grid[y][x]
+    return tile == "snow" or tile == "path" or tile == "fire_safe" or tile == "cabin_floor" or tile == "cave_floor"
+end
+
+local function addResourceNode(list, nodeType, x, y, payload)
+    local node = {
+        type = nodeType,
+        coord = worldCoord(x, y),
+        opened = false,
+    }
+    if payload then
+        for key, value in pairs(payload) do
+            node[key] = value
+        end
+    end
+    table.insert(list, node)
+end
+
+local function randomLoot()
+    local options = {
+        {"canned_food", 1},
+        {"water", 1},
+        {"cloth", 1},
+        {"tea", 1},
+        {"bandage", 1},
+        {"painkillers", 1},
+        {"antiseptic", 1},
+        {"antibiotics", 1},
+        {"tinder", 2},
+        {"matches", 3},
+        {"sticks", 2},
+        {"firewood", 1},
+        {"snow", 1},
+        {"raw_meat", 1},
+        {"raw_fish", 1},
+        {"torch", 1},
+        {"flare", 1},
+        {"accelerant", 1},
+        {"charcoal", 1},
+        {"arrow", 2},
+        {"fishing_tackle", 1},
+        {"bow", 1},
+        {"snare", 1},
+    }
+    local choice = options[math.random(#options)]
+    return {Items.create(choice[1], choice[2])}
+end
+
+local function makeFishingSpot(x, y, name)
+    return {
+        coord = worldCoord(x, y),
+        name = name or "Fishing Hole",
+    }
+end
+
+local function makeMapNode(x, y, name)
+    return {
+        coord = worldCoord(x, y),
+        name = name or "Overlook",
+    }
+end
+
+local function makeClimbNode(x, y, targetX, targetY, name)
+    return {
+        coord = worldCoord(x, y),
+        targetCoord = worldCoord(targetX, targetY),
+        name = name or "Rope Climb",
+    }
+end
+
+local function makeWorkbench(x, y, name)
+    return {
+        coord = worldCoord(x, y),
+        name = name or "Workbench",
+    }
+end
+
+local function makeCuringStation(x, y, name)
+    return {
+        coord = worldCoord(x, y),
+        name = name or "Curing Rack",
+    }
+end
+
+local function makeCarcass(kind, x, y)
+    return {
+        kind = kind,
+        coord = worldCoord(x, y),
+        meat = kind == "deer" and 3 or 1,
+        hide = kind == "deer" and 1 or 1,
+        gut = kind == "deer" and 2 or (kind == "rabbit" and 1 or 0),
+        feathers = kind == "fish" and 0 or 2,
+    }
+end
+
+local function placeLake(grid)
+    local weakIceTiles = {}
+    local lakeArea = {x = 11, y = 10, w = 8, h = 6}
+
+    fillRect(grid, lakeArea.x, lakeArea.y, lakeArea.w, lakeArea.h, "ice")
+
+    local candidates = {}
+    for y = lakeArea.y, lakeArea.y + lakeArea.h - 1 do
+        for x = lakeArea.x, lakeArea.x + lakeArea.w - 1 do
+            table.insert(candidates, {x = x, y = y})
+        end
+    end
+    Utils.shuffle(candidates)
+
+    local weakIceCount = math.random(CONFIG.WEAK_ICE_MIN, CONFIG.WEAK_ICE_MAX)
+    for index = 1, weakIceCount do
+        local tile = candidates[index]
+        setTile(grid, tile.x, tile.y, "weak_ice")
+        table.insert(weakIceTiles, {x = tile.x, y = tile.y})
+    end
+
+    return weakIceTiles, lakeArea
+end
+
+local function generateProceduralRunData(difficultyName)
+    local difficultyKey = CONFIG.DIFFICULTY_ALIASES[difficultyName] or difficultyName
+    local difficulty = CONFIG.DIFFICULTY_SETTINGS[difficultyKey] or CONFIG.DIFFICULTY_SETTINGS.voyageur
+    local grid = newGrid()
+    buildBorder(grid)
+
+    local structures = {
+        addCabin(grid, 3, 4, "Ranger Cabin"),
+        addCabin(grid, 21, 20, "Trapline Cabin"),
+        addCave(grid, 20, 4),
+    }
+
+    local weakIceTiles, lakeArea = placeLake(grid)
+    fillRect(grid, 6, 15, 4, 3, "fire_safe")
+
+    carvePath(grid, structures[1].door.x, structures[1].door.y, 8, 16)
+    carvePath(grid, 8, 16, 11, 13)
+    carvePath(grid, 18, 13, 24, 13)
+    carvePath(grid, 24, 13, structures[3].mouth.x, structures[3].mouth.y)
+    carvePath(grid, 18, 15, structures[2].door.x, structures[2].door.y)
+
+    for x = 7, 9 do
+        for y = 19, 23 do
+            if grid[y][x] == "snow" then
+                setTile(grid, x, y, (x + y) % 2 == 0 and "tree" or "rock")
             end
         end
     end
 
-    local function split(x, y, w, h, depth)
-        if depth >= CONFIG.PROCGEN_MAX_DEPTH
-            or w < CONFIG.PROCGEN_MIN_ROOM_SIZE * 2
-            or h < CONFIG.PROCGEN_MIN_ROOM_SIZE * 2 then
-            local minRoomW = math.min(CONFIG.PROCGEN_MIN_ROOM_SIZE, math.max(3, w - 2))
-            local maxRoomW = math.max(minRoomW, math.min(CONFIG.PROCGEN_MAX_ROOM_SIZE, math.max(3, w - 2)))
-            local minRoomH = math.min(CONFIG.PROCGEN_MIN_ROOM_SIZE, math.max(3, h - 2))
-            local maxRoomH = math.max(minRoomH, math.min(CONFIG.PROCGEN_MAX_ROOM_SIZE, math.max(3, h - 2)))
+    local resourceNodes = {}
+    local safeSleepSpots = {
+        worldCoord(structures[1].bed.x, structures[1].bed.y),
+        worldCoord(structures[2].bed.x, structures[2].bed.y),
+        worldCoord(structures[3].bed.x, structures[3].bed.y),
+    }
+    local temperatureBands = {
+        {type = "shelter", zone = makeZone(3, 4, 6, 5), modifier = 8},
+        {type = "shelter", zone = makeZone(21, 20, 6, 5), modifier = 8},
+        {type = "cave", zone = makeZone(20, 4, 7, 5), modifier = 10},
+        {type = "lake", zone = lakeArea, modifier = -6},
+    }
+    local workbenches = {
+        makeWorkbench(structures[1].workbench.x, structures[1].workbench.y, "Ranger Workbench"),
+        makeWorkbench(structures[2].workbench.x, structures[2].workbench.y, "Trapline Workbench"),
+    }
+    local curingStations = {
+        makeCuringStation(structures[1].workbench.x, structures[1].workbench.y, "Ranger Curing Rack"),
+        makeCuringStation(structures[2].workbench.x, structures[2].workbench.y, "Trapline Curing Rack"),
+    }
+    local fishingSpots = {
+        makeFishingSpot(lakeArea.x + 1, lakeArea.y + 2, "Lower Fishing Hole"),
+        makeFishingSpot(lakeArea.x + lakeArea.w - 2, lakeArea.y + 3, "North Fishing Hole"),
+    }
+    local climbNodes = {
+        makeClimbNode(18, 7, 10, 4, "Ridge Rope"),
+    }
+    local mapNodes = {
+        makeMapNode(10, 4, "Frozen Overlook"),
+        makeMapNode(structures[3].mouth.x, structures[3].mouth.y, "Cave Mouth Overlook"),
+    }
+    local carcasses = {
+        makeCarcass("deer", 22, 24),
+    }
+    local pointsOfInterest = {
+        {name = "Ranger Cabin", coord = worldCoord(structures[1].bed.x, structures[1].bed.y)},
+        {name = "Trapline Cabin", coord = worldCoord(structures[2].bed.x, structures[2].bed.y)},
+        {name = "Frozen Lake", coord = worldCoord(lakeArea.x + 3, lakeArea.y + 2)},
+        {name = "North Cave", coord = worldCoord(structures[3].mouth.x, structures[3].mouth.y)},
+    }
 
-            local roomW = math.random(minRoomW, maxRoomW)
-            local roomH = math.random(minRoomH, maxRoomH)
-            local roomX = x + math.random(1, math.max(1, w - roomW - 1))
-            local roomY = y + math.random(1, math.max(1, h - roomH - 1))
-            local room = {x = roomX, y = roomY, w = roomW, h = roomH}
-            carveRoom(room.x, room.y, room.w, room.h)
-            table.insert(rooms, room)
-            return
-        end
+    addResourceNode(resourceNodes, "cache", structures[1].x + 3, structures[1].y + 2, {loot = randomLoot()})
+    addResourceNode(resourceNodes, "cache", structures[2].x + 3, structures[2].y + 2, {loot = randomLoot()})
+    addResourceNode(resourceNodes, "loot", 8, 16, {loot = randomLoot()})
+    addResourceNode(resourceNodes, "loot", 24, 13, {loot = randomLoot()})
+    addResourceNode(resourceNodes, "loot", 22, 6, {loot = randomLoot()})
+    addResourceNode(resourceNodes, "loot", 24, 22, {loot = randomLoot()})
 
-        local splitHorizontal = math.random() > 0.5
-        if w > h then
-            splitHorizontal = false
-        elseif h > w then
-            splitHorizontal = true
+    local lootTarget = math.max(CONFIG.RESOURCE_LOOT_MIN, math.floor(CONFIG.RESOURCE_LOOT_MAX * difficulty.lootMultiplier))
+    local lootCandidates = {
+        {x = 14, y = 8}, {x = 16, y = 19}, {x = 11, y = 20},
+        {x = 18, y = 23}, {x = 9, y = 9}, {x = 26, y = 10},
+    }
+    Utils.shuffle(lootCandidates)
+    while #resourceNodes < lootTarget + 2 do
+        local candidate = table.remove(lootCandidates)
+        if not candidate then
+            break
         end
-
-        if splitHorizontal then
-            local splitPos = math.random(math.floor(h / 3), math.floor(h * 2 / 3))
-            split(x, y, w, splitPos, depth + 1)
-            split(x, y + splitPos, w, h - splitPos, depth + 1)
-        else
-            local splitPos = math.random(math.floor(w / 3), math.floor(w * 2 / 3))
-            split(x, y, splitPos, h, depth + 1)
-            split(x + splitPos, y, w - splitPos, h, depth + 1)
-        end
+        addResourceNode(resourceNodes, "loot", candidate.x, candidate.y, {loot = randomLoot()})
     end
 
-    split(1, 1, width, height, 0)
-
-    for i = 1, #rooms - 1 do
-        local roomA = rooms[i]
-        local roomB = rooms[i + 1]
-        local ax = roomA.x + math.floor(roomA.w / 2)
-        local ay = roomA.y + math.floor(roomA.h / 2)
-        local bx = roomB.x + math.floor(roomB.w / 2)
-        local by = roomB.y + math.floor(roomB.h / 2)
-
-        for x = math.min(ax, bx), math.max(ax, bx) do
-            grid[ay][x] = 0
-            if ay + 1 <= height then
-                grid[ay + 1][x] = 0
+    local woodTarget = math.random(CONFIG.RESOURCE_WOOD_MIN, CONFIG.RESOURCE_WOOD_MAX)
+    local woodCandidates = {}
+    for y = 2, CONFIG.GRID_HEIGHT - 1 do
+        for x = 2, CONFIG.GRID_WIDTH - 1 do
+            if canPlaceResource(grid, x, y) and math.abs(x - 15) + math.abs(y - 13) > 6 then
+                table.insert(woodCandidates, {x = x, y = y})
             end
         end
+    end
+    Utils.shuffle(woodCandidates)
+    for index = 1, woodTarget do
+        local candidate = woodCandidates[index]
+        if candidate then
+            addResourceNode(resourceNodes, "wood", candidate.x, candidate.y, {
+                loot = {
+                    Items.create("sticks", math.random(2, 4)),
+                    Items.create("firewood", 1),
+                    Items.create("snow", 1),
+                },
+            })
+        end
+    end
 
-        for y = math.min(ay, by), math.max(ay, by) do
-            grid[y][bx] = 0
-            if bx + 1 <= width then
-                grid[y][bx + 1] = 0
+    local wolfTerritory = makeZone(17, 10, 10, 9)
+    local wolves = {}
+    for index = 1, difficulty.wolfCount do
+        table.insert(wolves, {
+            kind = "wolf",
+            coord = worldCoord(20 + index * 2, 12 + index),
+            territory = wolfTerritory,
+            territoryCenter = zoneCenter(wolfTerritory),
+            state = "roam",
+            target = nil,
+            fearHours = 0,
+        })
+    end
+
+    local rabbitZones = {
+        makeZone(4, 9, 5, 4),
+        makeZone(5, 22, 5, 4),
+    }
+    local deerZone = makeZone(19, 23, 7, 4)
+
+    local rabbits = {}
+    for _, zone in ipairs(rabbitZones) do
+        table.insert(rabbits, {
+            kind = "rabbit",
+            zone = zone,
+            coord = worldCoord(zone.x + 1, zone.y + 1),
+            speed = 20,
+        })
+    end
+
+    local deer = {
+        {
+            kind = "deer",
+            zone = deerZone,
+            coord = worldCoord(deerZone.x + 2, deerZone.y + 1),
+            speed = 24,
+        }
+    }
+
+    return {
+        grid = grid,
+        playerStart = worldCoord(structures[1].bed.x, structures[1].bed.y),
+        structures = structures,
+        resourceNodes = resourceNodes,
+        fires = {},
+        traps = {},
+        carcasses = carcasses,
+        fishingSpots = fishingSpots,
+        climbNodes = climbNodes,
+        mapNodes = mapNodes,
+        workbenches = workbenches,
+        curingStations = curingStations,
+        curing = {},
+        mappedTiles = {},
+        pointsOfInterest = pointsOfInterest,
+        wildlife = {
+            wolves = wolves,
+            rabbits = rabbits,
+            deer = deer,
+        },
+        weather = {
+            current = "clear",
+            hoursUntilChange = math.random(CONFIG.WEATHER_CHANGE_MIN_HOURS, CONFIG.WEATHER_CHANGE_MAX_HOURS),
+        },
+        timeOfDay = 8,
+        dayCount = 1,
+        temperatureBands = temperatureBands,
+        safeSleepSpots = safeSleepSpots,
+        weakIceTiles = weakIceTiles,
+        snowShelters = {},
+        wolfTerritory = wolfTerritory,
+        rabbitZones = rabbitZones,
+        deerZone = deerZone,
+        carcassSites = {
+            {coord = worldCoord(22, 24), kind = "deer"},
+        },
+        source = "procedural",
+    }
+end
+
+local function normalizeLayout(layout)
+    local lines = (layout and layout.lines) or {}
+    local grid = {}
+    for y = 1, CONFIG.GRID_HEIGHT do
+        local line = lines[y] or ""
+        grid[y] = {}
+        for x = 1, CONFIG.GRID_WIDTH do
+            local symbol = line:sub(x, x)
+            grid[y][x] = symbol ~= "" and symbol or " "
+        end
+    end
+    return grid
+end
+
+local function firstSymbol(symbolGrid, symbol)
+    for y = 1, CONFIG.GRID_HEIGHT do
+        for x = 1, CONFIG.GRID_WIDTH do
+            if symbolGrid[y][x] == symbol then
+                return x, y
             end
-        end
-    end
-
-    return grid, rooms
-end
-
-local function roomTiles(room)
-    local tiles = {}
-    for y = room.y + 1, room.y + room.h - 2 do
-        for x = room.x + 1, room.x + room.w - 2 do
-            table.insert(tiles, {x = x, y = y})
-        end
-    end
-    Utils.shuffle(tiles)
-    return tiles
-end
-
-local function tileKey(tile)
-    return tile.x .. ":" .. tile.y
-end
-
-local function chooseTile(room, used)
-    local tiles = roomTiles(room)
-    for _, tile in ipairs(tiles) do
-        if not used[tileKey(tile)] then
-            used[tileKey(tile)] = true
-            return tile
         end
     end
     return nil
 end
 
-local function toWorld(tile)
-    return {(tile.x - 1) * CONFIG.TILE_SIZE, (tile.y - 1) * CONFIG.TILE_SIZE}
-end
-
-local function makeZone(room, padding)
-    padding = padding or 0
-    local x = math.max(0, (room.x - 1) * CONFIG.TILE_SIZE - padding)
-    local y = math.max(0, (room.y - 1) * CONFIG.TILE_SIZE - padding)
-    local width = math.min(CONFIG.WINDOW_WIDTH - x, room.w * CONFIG.TILE_SIZE + padding * 2)
-    local height = math.min(CONFIG.WINDOW_HEIGHT - y, room.h * CONFIG.TILE_SIZE + padding * 2)
-    return {x = x, y = y, width = width, height = height}
-end
-
-local function pickMonsterType(difficultyName, counts)
-    local weights = {
-        easy = {
-            chaser = 5,
-            patrol_warden = 3,
-            lurker = 1,
-            wailer = 1,
-            stalker = 1,
-        },
-        normal = {
-            chaser = 4,
-            patrol_warden = 3,
-            lurker = 2,
-            wailer = 2,
-            stalker = 2,
-        },
-        hard = {
-            chaser = 3,
-            patrol_warden = 3,
-            lurker = 2,
-            wailer = 3,
-            stalker = 3,
-        },
-        nightmare = {
-            chaser = 2,
-            patrol_warden = 3,
-            lurker = 3,
-            wailer = 3,
-            stalker = 4,
-        }
+local function collectComponents(symbolGrid, symbol)
+    local components = {}
+    local visited = {}
+    local directions = {
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
     }
 
-    local pool = weights[difficultyName] or weights.normal
-    if counts.wailer >= 2 then
-        pool.wailer = 0
-    end
-    if counts.stalker >= 2 then
-        pool.stalker = 0
+    for y = 1, CONFIG.GRID_HEIGHT do
+        visited[y] = {}
     end
 
-    local total = 0
-    for _, weight in pairs(pool) do
-        total = total + weight
-    end
+    for y = 1, CONFIG.GRID_HEIGHT do
+        for x = 1, CONFIG.GRID_WIDTH do
+            if symbolGrid[y][x] == symbol and not visited[y][x] then
+                local queue = {{x = x, y = y}}
+                local index = 1
+                local cells = {}
+                local minX, maxX = x, x
+                local minY, maxY = y, y
+                visited[y][x] = true
 
-    local roll = math.random(total)
-    local running = 0
-    for monsterType, weight in pairs(pool) do
-        running = running + weight
-        if roll <= running then
-            counts[monsterType] = (counts[monsterType] or 0) + 1
-            return monsterType
-        end
-    end
+                while index <= #queue do
+                    local current = queue[index]
+                    index = index + 1
+                    table.insert(cells, current)
+                    minX = math.min(minX, current.x)
+                    maxX = math.max(maxX, current.x)
+                    minY = math.min(minY, current.y)
+                    maxY = math.max(maxY, current.y)
 
-    counts.chaser = (counts.chaser or 0) + 1
-    return "chaser"
-end
-
-local function buildVariants(grid)
-    local floorVariants = {}
-    local wallVariants = {}
-
-    for y = 1, #grid do
-        floorVariants[y] = {}
-        wallVariants[y] = {}
-        for x = 1, #grid[y] do
-            floorVariants[y][x] = math.random(1, 2)
-            wallVariants[y][x] = math.random(1, 3)
-        end
-    end
-
-    return floorVariants, wallVariants
-end
-
-function ProcGen.generateRunData(difficultyName)
-    local grid, rooms = ProcGen.generateRoomLayout(CONFIG.GRID_WIDTH, CONFIG.GRID_HEIGHT)
-    Utils.shuffle(rooms)
-
-    local difficulty = CONFIG.DIFFICULTY_SETTINGS[difficultyName] or CONFIG.DIFFICULTY_SETTINGS.normal
-    local used = {}
-    local monsters = {}
-    local keys = {}
-    local items = {}
-    local darkZones = {}
-    local safeZones = {}
-    local shrines = {}
-    local hazards = {
-        spikes = {},
-        cursedZones = {},
-    }
-
-    local startRoom = cloneRoom(rooms[1])
-    local recoveryRoom = cloneRoom(rooms[math.min(#rooms, 2)])
-    local candidateRooms = {}
-    for index = 3, #rooms do
-        table.insert(candidateRooms, cloneRoom(rooms[index]))
-    end
-    Utils.shuffle(candidateRooms)
-
-    local playerTile = chooseTile(startRoom, used)
-    local playerStart = toWorld(playerTile)
-
-    table.insert(safeZones, makeZone(startRoom, CONFIG.SAFE_ZONE_PADDING))
-    table.insert(safeZones, makeZone(recoveryRoom, CONFIG.SAFE_ZONE_PADDING))
-    table.insert(shrines, toWorld(chooseTile(recoveryRoom, used)))
-
-    for index = 1, math.min(CONFIG.PROCGEN_DARK_ZONE_COUNT, #candidateRooms) do
-        table.insert(darkZones, makeZone(candidateRooms[index], 0))
-    end
-
-    for index = 1, math.min(CONFIG.PROCGEN_CURSED_ROOM_COUNT, math.max(0, #candidateRooms - CONFIG.PROCGEN_DARK_ZONE_COUNT)) do
-        local room = candidateRooms[CONFIG.PROCGEN_DARK_ZONE_COUNT + index]
-        if room then
-            table.insert(hazards.cursedZones, makeZone(room, 0))
-        end
-    end
-
-    for _ = 1, difficulty.keyCount do
-        local room = candidateRooms[math.random(#candidateRooms)] or recoveryRoom
-        local tile = chooseTile(room, used)
-        if tile then
-            table.insert(keys, {coord = toWorld(tile)})
-        end
-    end
-
-    local itemCount = math.max(2, math.floor((difficulty.spawnBudget * difficulty.itemMultiplier) + 0.5))
-    for index = 1, itemCount do
-        local room = candidateRooms[((index - 1) % math.max(#candidateRooms, 1)) + 1] or recoveryRoom
-        local tile = chooseTile(room, used)
-        if tile then
-            local kind = "calming_tonic"
-            if index % 3 == 0 then
-                kind = "ward_charge"
-            elseif index % 2 == 0 then
-                kind = "speed_tonic"
-            end
-            table.insert(items, {coord = toWorld(tile), kind = kind})
-        end
-    end
-
-    local spikeCount = Utils.clamp(
-        math.floor((difficulty.spawnBudget * CONFIG.PROCGEN_SPIKE_MULTIPLIER) + 0.5),
-        CONFIG.PROCGEN_SPIKE_MIN,
-        CONFIG.PROCGEN_SPIKE_MAX
-    )
-
-    for index = 1, spikeCount do
-        local room = candidateRooms[((index + CONFIG.PROCGEN_DARK_ZONE_COUNT + CONFIG.PROCGEN_CURSED_ROOM_COUNT - 1)
-            % math.max(#candidateRooms, 1)) + 1]
-        if room then
-            local tile = chooseTile(room, used)
-            if tile then
-                table.insert(hazards.spikes, {
-                    coord = toWorld(tile),
-                    timer = (index - 1) * 0.25,
-                    active = false,
-                    hitCooldown = 0,
-                })
-            end
-        end
-    end
-
-    local monsterCounts = {
-        chaser = 0,
-        patrol_warden = 0,
-        lurker = 0,
-        wailer = 0,
-        stalker = 0,
-    }
-
-    for index = 1, difficulty.spawnBudget do
-        local room = candidateRooms[((index - 1) % math.max(#candidateRooms, 1)) + 1]
-        if room then
-            local tile = chooseTile(room, used)
-            if tile then
-                local monsterType = pickMonsterType(difficultyName, monsterCounts)
-                local patrolTiles = roomTiles(room)
-                local patrolPoints = {}
-                for patrolIndex = 1, math.min(4, #patrolTiles) do
-                    table.insert(patrolPoints, toWorld(patrolTiles[patrolIndex]))
+                    for _, direction in ipairs(directions) do
+                        local nextX = current.x + direction[1]
+                        local nextY = current.y + direction[2]
+                        if inBounds(nextX, nextY)
+                            and symbolGrid[nextY][nextX] == symbol
+                            and not visited[nextY][nextX] then
+                            visited[nextY][nextX] = true
+                            table.insert(queue, {x = nextX, y = nextY})
+                        end
+                    end
                 end
-                table.insert(monsters, {
-                    type = monsterType,
-                    coord = toWorld(tile),
-                    patrolPoints = patrolPoints,
-                    room = room,
+
+                table.insert(components, {
+                    cells = cells,
+                    x = minX,
+                    y = minY,
+                    width = maxX - minX + 1,
+                    height = maxY - minY + 1,
                 })
             end
         end
     end
 
-    local floorVariants, wallVariants = buildVariants(grid)
+    return components
+end
+
+local function normalizeBounds(component, minWidth, minHeight)
+    local centerX = component.x + math.floor((component.width - 1) / 2)
+    local centerY = component.y + math.floor((component.height - 1) / 2)
+    local width = math.max(component.width, minWidth)
+    local height = math.max(component.height, minHeight)
+    local maxX = math.max(2, CONFIG.GRID_WIDTH - width)
+    local maxY = math.max(2, CONFIG.GRID_HEIGHT - height)
+
+    return {
+        x = Utils.clamp(centerX - math.floor(width / 2), 2, maxX),
+        y = Utils.clamp(centerY - math.floor(height / 2), 2, maxY),
+        width = width,
+        height = height,
+    }
+end
+
+local function applyLayoutTiles(grid, symbolGrid)
+    local weakIceTiles = {}
+    local shelterCells = {}
+
+    for y = 1, CONFIG.GRID_HEIGHT do
+        for x = 1, CONFIG.GRID_WIDTH do
+            local symbol = symbolGrid[y][x]
+            if symbol == "#" then
+                setTile(grid, x, y, "rock")
+            elseif symbol == "." then
+                setTile(grid, x, y, "snow")
+            elseif symbol == " " then
+                setTile(grid, x, y, "path")
+            elseif symbol == "F" then
+                setTile(grid, x, y, "fire_safe")
+            elseif symbol == "L" then
+                setTile(grid, x, y, "ice")
+            elseif symbol == "W" then
+                setTile(grid, x, y, "weak_ice")
+                table.insert(weakIceTiles, {x = x, y = y})
+            elseif symbol == "B" then
+                setTile(grid, x, y, "cabin_workbench")
+            elseif symbol == "H" then
+                setTile(grid, x, y, "snow")
+                table.insert(shelterCells, {x = x, y = y})
+            else
+                setTile(grid, x, y, "snow")
+            end
+        end
+    end
+
+    return weakIceTiles, shelterCells
+end
+
+local function nodeTypeForTile(tile)
+    if tile == "cabin_floor" or tile == "cabin_bed" or tile == "cabin_stove" or tile == "cabin_workbench" or tile == "cave_floor" then
+        return "cache"
+    end
+    return "loot"
+end
+
+local function generateEditorRunData(difficultyName, layout)
+    local symbolGrid = normalizeLayout(layout)
+    local grid = newGrid()
+    local structures = {}
+    local resourceNodes = {}
+    local safeSleepSpots = {}
+    local temperatureBands = {}
+    local snowShelters = {}
+    local weakIceTiles, shelterCells = applyLayoutTiles(grid, symbolGrid)
+    local workbenches = {}
+    local curingStations = {}
+    local fishingSpots = {}
+    local climbNodes = {}
+    local mapNodes = {}
+    local carcasses = {}
+    local pointsOfInterest = {}
+
+    local cabinCount = 0
+    for _, component in ipairs(collectComponents(symbolGrid, "C")) do
+        local bounds = normalizeBounds(component, 6, 5)
+        cabinCount = cabinCount + 1
+        local cabin = addCabin(grid, bounds.x, bounds.y, string.format("Editor Cabin %d", cabinCount), bounds.width, bounds.height)
+        table.insert(structures, cabin)
+        table.insert(safeSleepSpots, worldCoord(cabin.bed.x, cabin.bed.y))
+        table.insert(workbenches, makeWorkbench(cabin.workbench.x, cabin.workbench.y, string.format("Editor Workbench %d", cabinCount)))
+        table.insert(curingStations, makeCuringStation(cabin.workbench.x, cabin.workbench.y, string.format("Editor Curing Rack %d", cabinCount)))
+        table.insert(pointsOfInterest, {name = cabin.name, coord = worldCoord(cabin.bed.x, cabin.bed.y)})
+        table.insert(temperatureBands, {
+            type = "shelter",
+            zone = makeZone(bounds.x, bounds.y, bounds.width, bounds.height),
+            modifier = 8,
+        })
+    end
+
+    for _, component in ipairs(collectComponents(symbolGrid, "V")) do
+        local bounds = normalizeBounds(component, 7, 5)
+        local cave = addCave(grid, bounds.x, bounds.y, bounds.width, bounds.height)
+        table.insert(structures, cave)
+        table.insert(safeSleepSpots, worldCoord(cave.bed.x, cave.bed.y))
+        table.insert(pointsOfInterest, {name = "Editor Cave", coord = worldCoord(cave.mouth.x, cave.mouth.y)})
+        table.insert(temperatureBands, {
+            type = "cave",
+            zone = makeZone(bounds.x, bounds.y, bounds.width, bounds.height),
+            modifier = 10,
+        })
+    end
+
+    for _, component in ipairs(collectComponents(symbolGrid, "L")) do
+        table.insert(temperatureBands, {
+            type = "lake",
+            zone = makeZone(component.x, component.y, component.width, component.height),
+            modifier = -6,
+        })
+    end
+
+    for _, cell in ipairs(shelterCells) do
+        table.insert(snowShelters, {
+            coord = worldCoord(cell.x, cell.y),
+            integrity = 100,
+        })
+        table.insert(safeSleepSpots, worldCoord(cell.x, cell.y))
+        table.insert(temperatureBands, {
+            type = "snow_shelter",
+            zone = makeZone(cell.x, cell.y, 1, 1),
+            modifier = 6,
+        })
+    end
+
+    for _, component in ipairs(collectComponents(symbolGrid, "O")) do
+        local centerX = component.x + math.floor(component.width / 2)
+        local centerY = component.y + math.floor(component.height / 2)
+        addResourceNode(resourceNodes, nodeTypeForTile(grid[centerY][centerX]), centerX, centerY, {loot = randomLoot()})
+    end
+
+    for _, component in ipairs(collectComponents(symbolGrid, "B")) do
+        local centerX = component.x + math.floor(component.width / 2)
+        local centerY = component.y + math.floor(component.height / 2)
+        table.insert(workbenches, makeWorkbench(centerX, centerY, "Editor Workbench"))
+        table.insert(curingStations, makeCuringStation(centerX, centerY, "Editor Curing Rack"))
+    end
+
+    for _, component in ipairs(collectComponents(symbolGrid, "I")) do
+        local centerX = component.x + math.floor(component.width / 2)
+        local centerY = component.y + math.floor(component.height / 2)
+        table.insert(fishingSpots, makeFishingSpot(centerX, centerY, "Editor Fishing Hole"))
+    end
+
+    for _, component in ipairs(collectComponents(symbolGrid, "M")) do
+        local centerX = component.x + math.floor(component.width / 2)
+        local centerY = component.y + math.floor(component.height / 2)
+        table.insert(mapNodes, makeMapNode(centerX, centerY, "Editor Overlook"))
+    end
+
+    for _, component in ipairs(collectComponents(symbolGrid, "P")) do
+        local centerX = component.x + math.floor(component.width / 2)
+        local centerY = component.y + math.floor(component.height / 2)
+        table.insert(climbNodes, makeClimbNode(centerX, centerY, math.max(2, centerX - 2), math.max(2, centerY - 2), "Editor Rope"))
+    end
+
+    for _, component in ipairs(collectComponents(symbolGrid, "Q")) do
+        local centerX = component.x + math.floor(component.width / 2)
+        local centerY = component.y + math.floor(component.height / 2)
+        table.insert(carcasses, makeCarcass("deer", centerX, centerY))
+    end
+
+    local wolfZones = {}
+    local wolves = {}
+    for _, component in ipairs(collectComponents(symbolGrid, "K")) do
+        local zone = makeZone(component.x, component.y, component.width, component.height)
+        table.insert(wolfZones, zone)
+        table.insert(wolves, {
+            kind = "wolf",
+            coord = worldCoord(component.x + math.floor(component.width / 2), component.y + math.floor(component.height / 2)),
+            territory = zone,
+            territoryCenter = zoneCenter(zone),
+            state = "roam",
+            target = nil,
+            fearHours = 0,
+        })
+    end
+
+    local rabbitZones = {}
+    local rabbits = {}
+    for _, component in ipairs(collectComponents(symbolGrid, "R")) do
+        local zone = makeZone(component.x, component.y, component.width, component.height)
+        table.insert(rabbitZones, zone)
+        table.insert(rabbits, {
+            kind = "rabbit",
+            zone = zone,
+            coord = worldCoord(component.x + math.floor(component.width / 2), component.y + math.floor(component.height / 2)),
+            speed = 20,
+        })
+    end
+
+    local deerZones = {}
+    local deer = {}
+    for _, component in ipairs(collectComponents(symbolGrid, "D")) do
+        local zone = makeZone(component.x, component.y, component.width, component.height)
+        table.insert(deerZones, zone)
+        table.insert(deer, {
+            kind = "deer",
+            zone = zone,
+            coord = worldCoord(component.x + math.floor(component.width / 2), component.y + math.floor(component.height / 2)),
+            speed = 24,
+        })
+    end
+
+    local startX, startY = firstSymbol(symbolGrid, "@")
+    local playerStart
+    if startX and startY then
+        playerStart = worldCoord(startX, startY)
+    elseif safeSleepSpots[1] then
+        playerStart = {safeSleepSpots[1][1], safeSleepSpots[1][2]}
+    else
+        playerStart = worldCoord(2, 2)
+    end
 
     return {
         grid = grid,
-        rooms = rooms,
         playerStart = playerStart,
-        monsters = monsters,
-        keys = keys,
-        items = items,
-        safeZones = safeZones,
-        darkZones = darkZones,
-        shrines = shrines,
-        hazards = hazards,
-        floorVariants = floorVariants,
-        wallVariants = wallVariants,
+        structures = structures,
+        resourceNodes = resourceNodes,
+        fires = {},
+        traps = {},
+        carcasses = carcasses,
+        fishingSpots = fishingSpots,
+        climbNodes = climbNodes,
+        mapNodes = mapNodes,
+        workbenches = workbenches,
+        curingStations = curingStations,
+        curing = {},
+        mappedTiles = {},
+        pointsOfInterest = pointsOfInterest,
+        wildlife = {
+            wolves = wolves,
+            rabbits = rabbits,
+            deer = deer,
+        },
+        weather = {
+            current = "clear",
+            hoursUntilChange = math.random(CONFIG.WEATHER_CHANGE_MIN_HOURS, CONFIG.WEATHER_CHANGE_MAX_HOURS),
+        },
+        timeOfDay = 8,
+        dayCount = 1,
+        temperatureBands = temperatureBands,
+        safeSleepSpots = safeSleepSpots,
+        weakIceTiles = weakIceTiles,
+        snowShelters = snowShelters,
+        wolfTerritory = wolfZones[1],
+        rabbitZones = rabbitZones,
+        deerZone = deerZones[1],
+        carcassSites = {},
+        source = "editor",
+        editorLayout = {
+            filename = layout and layout.filename or "custom.txt",
+        },
     }
+end
+
+function ProcGen.generateRunData(difficultyName, options)
+    options = options or {}
+    if options.layout then
+        return generateEditorRunData(difficultyName, options.layout)
+    end
+    return generateProceduralRunData(difficultyName)
 end
 
 return ProcGen

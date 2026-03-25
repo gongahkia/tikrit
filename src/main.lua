@@ -1,27 +1,26 @@
 local CONFIG = require("config")
 
 local Utils = require("modules/utils")
-local AI = require("modules/ai")
-local Effects = require("modules/effects")
 local UI = require("modules/ui")
-local Animation = require("modules/animation")
-local Audio = require("modules/audio")
-local Combat = require("modules/combat")
 local ProcGen = require("modules/procgen")
-local Hazards = require("modules/hazards")
 local Accessibility = require("modules/accessibility")
-local Events = require("modules/events")
 local Progression = require("modules/progression")
 local Editor = require("modules/editor")
 local Replay = require("modules/replay")
 local Settings = require("modules/settings")
-local Sanity = require("modules/sanity")
+local Items = require("modules/items")
+local Survival = require("modules/survival")
+local Fire = require("modules/fire")
+local Wildlife = require("modules/wildlife")
+local Effects = require("modules/effects")
+local SpriteRegistry = require("modules/sprite_registry")
+local SoundEvents = require("modules/sound_events")
 
 local game = {
     screen = "title",
     previousScreen = "title",
-    difficultyNames = {"easy", "normal", "hard", "nightmare"},
-    selectedDifficulty = "normal",
+    difficultyNames = {"pilgrim", "voyageur", "stalker", "interloper"},
+    selectedDifficulty = "voyageur",
     titleIndex = 1,
     titleItems = {},
     pauseIndex = 1,
@@ -42,7 +41,6 @@ local game = {
         index = 1,
         entries = {},
     },
-    debugToolsEnabled = false,
     settings = nil,
     run = nil,
     input = {
@@ -51,8 +49,12 @@ local game = {
 }
 
 local sprites = {}
-local sounds = {}
 local fonts = {}
+local updateRunSignals
+local applyPendingShake
+local refreshCraftMenu
+local isVisibleTile
+local isMappedTile
 
 local SETTINGS_DEFS = {
     audio = {
@@ -61,18 +63,15 @@ local SETTINGS_DEFS = {
         {path = "audio.sfx", label = "SFX", kind = "float", min = 0, max = 1, step = 0.1},
     },
     gameplay = {
-        {path = "gameplay.minimap", label = "Minimap", kind = "bool"},
         {path = "gameplay.screenShake", label = "Screen Shake", kind = "bool"},
-        {path = "gameplay.fog", label = "Fog", kind = "bool"},
-        {path = "gameplay.dailyChallenge", label = "Daily Challenge", kind = "bool"},
-        {path = "gameplay.timeAttack", label = "Time Attack", kind = "bool"},
+        {path = "gameplay.showHints", label = "Show Hints", kind = "bool"},
     },
     accessibility = {
         {path = "accessibility.colorblindMode", label = "Colorblind", kind = "enum", values = {"none", "protanopia", "deuteranopia", "tritanopia"}},
         {path = "accessibility.highContrast", label = "High Contrast", kind = "bool"},
         {path = "accessibility.slowMode", label = "Slow Mode", kind = "bool"},
         {path = "accessibility.fontScale", label = "Font Scale", kind = "float", min = 0.8, max = 1.5, step = 0.1},
-        {path = "accessibility.visualAudioIndicators", label = "Visual Audio", kind = "bool"},
+        {path = "accessibility.visualAlerts", label = "Visual Alerts", kind = "bool"},
     },
 }
 
@@ -81,7 +80,39 @@ local function formatBool(value)
 end
 
 local function titleCase(value)
-    return value:gsub("^%l", string.upper)
+    return tostring(value):gsub("^%l", string.upper)
+end
+
+local function canonicalDifficultyName(name)
+    return CONFIG.DIFFICULTY_ALIASES[name] or name or "voyageur"
+end
+
+local function formatModeLabel(mode)
+    if mode == "daily" then
+        return "Daily"
+    elseif mode == "replay" then
+        return "Replay"
+    end
+    return "Survival"
+end
+
+local function rebuildFonts()
+    local scale = game.settings.accessibility.fontScale
+    fonts.large = love.graphics.newFont("font/Amatic-Bold.ttf", math.floor(CONFIG.FONT_SIZE_LARGE * scale))
+    fonts.medium = love.graphics.newFont("font/Amatic-Bold.ttf", math.floor(CONFIG.FONT_SIZE_MEDIUM * scale))
+    fonts.small = love.graphics.newFont("font/Amatic-Bold.ttf", math.floor(CONFIG.FONT_SIZE_SMALL * scale))
+end
+
+local function buildTitleItems()
+    game.titleItems = {
+        {label = "Start Survival"},
+        {label = "Difficulty", value = titleCase(game.selectedDifficulty)},
+        {label = "Daily Run"},
+        {label = "Settings"},
+        {label = "Profile"},
+        {label = "Replays"},
+        {label = "Quit"},
+    }
 end
 
 local function formatSettingValue(def)
@@ -94,26 +125,6 @@ local function formatSettingValue(def)
     return tostring(value)
 end
 
-local function rebuildFonts()
-    local scale = game.settings.accessibility.fontScale
-    fonts.large = love.graphics.newFont("font/Amatic-Bold.ttf", math.floor(CONFIG.FONT_SIZE_LARGE * scale))
-    fonts.medium = love.graphics.newFont("font/Amatic-Bold.ttf", math.floor(CONFIG.FONT_SIZE_MEDIUM * scale))
-    fonts.small = love.graphics.newFont("font/Amatic-Bold.ttf", math.floor(CONFIG.FONT_SIZE_SMALL * scale))
-end
-
-local function buildTitleItems()
-    game.titleItems = {
-        {label = "Start Run"},
-        {label = "Difficulty", value = titleCase(game.selectedDifficulty)},
-        {label = "Daily Challenge", value = formatBool(game.settings.gameplay.dailyChallenge)},
-        {label = "Time Attack", value = formatBool(game.settings.gameplay.timeAttack)},
-        {label = "Settings"},
-        {label = "Progression"},
-        {label = "Replays"},
-        {label = "Quit"},
-    }
-end
-
 local function refreshSettingsOptions()
     local category = game.settingsScreen.categories[game.settingsScreen.categoryIndex]
     local definitions = SETTINGS_DEFS[category]
@@ -121,8 +132,8 @@ local function refreshSettingsOptions()
 
     for _, def in ipairs(definitions) do
         table.insert(game.settingsScreen.options, {
-            path = def.path,
             label = def.label,
+            path = def.path,
             value = formatSettingValue(def),
             definition = def,
         })
@@ -137,13 +148,7 @@ local function refreshSettingsOptions()
 end
 
 local function applyAudioSettings()
-    sounds.ambient:setVolume(game.settings.audio.master * game.settings.audio.music * CONFIG.AMBIENT_BASE_VOLUME)
-    sounds.walking:setVolume(game.settings.audio.master * game.settings.audio.sfx)
-    sounds.playerDeath:setVolume(game.settings.audio.master * game.settings.audio.sfx)
-    sounds.item:setVolume(game.settings.audio.master * game.settings.audio.sfx)
-    sounds.key:setVolume(game.settings.audio.master * game.settings.audio.sfx)
-    sounds.door:setVolume(game.settings.audio.master * game.settings.audio.sfx)
-    sounds.ghost:setVolume(game.settings.audio.master * game.settings.audio.sfx)
+    SoundEvents.applySettings(game.settings)
 end
 
 local function persistSettings()
@@ -157,7 +162,6 @@ end
 
 local function adjustSetting(definition, direction)
     local current = Settings.get(definition.path)
-
     if definition.kind == "bool" then
         Settings.set(definition.path, not current)
     elseif definition.kind == "float" then
@@ -179,63 +183,25 @@ local function adjustSetting(definition, direction)
         end
         Settings.set(definition.path, definition.values[currentIndex])
     end
-
     persistSettings()
 end
 
-local function buildWalls(grid)
-    local walls = {}
-    for y = 1, #grid do
-        for x = 1, #grid[y] do
-            if grid[y][x] == 1 then
-                table.insert(walls, {(x - 1) * CONFIG.TILE_SIZE, (y - 1) * CONFIG.TILE_SIZE})
-            end
+local function cycleDifficulty(direction)
+    local currentIndex = 1
+    for index, name in ipairs(game.difficultyNames) do
+        if name == game.selectedDifficulty then
+            currentIndex = index
+            break
         end
     end
-    return walls
-end
-
-local function createRuntimeWorld(generated, difficultyName)
-    local difficulty = CONFIG.DIFFICULTY_SETTINGS[difficultyName]
-    local player = {
-        coord = {generated.playerStart[1], generated.playerStart[2]},
-        lastMoveX = 0,
-        lastMoveY = 1,
-        alive = true,
-        baseSpeed = difficulty.playerSpeed,
-        speedBonus = 0,
-        inventory = {},
-        inventorySize = CONFIG.INVENTORY_SIZE,
-        overallKeyCount = 0,
-        attackDamage = CONFIG.PLAYER_ATTACK_DAMAGE,
-        extraLife = 0,
-        wardCharges = 0,
-        visionBonus = difficulty.visionBonus,
-    }
-    Sanity.initPlayer(player)
-
-    local monsters = {}
-    for _, spawn in ipairs(generated.monsters) do
-        table.insert(monsters, AI.createMonster(spawn, difficulty.monsterSpeed))
+    currentIndex = currentIndex + direction
+    if currentIndex < 1 then
+        currentIndex = #game.difficultyNames
+    elseif currentIndex > #game.difficultyNames then
+        currentIndex = 1
     end
-
-    local world = {
-        grid = generated.grid,
-        floorVariants = generated.floorVariants,
-        wallVariants = generated.wallVariants,
-        walls = buildWalls(generated.grid),
-        keys = Utils.deepCopy(generated.keys),
-        totalKeys = #generated.keys,
-        items = Utils.deepCopy(generated.items),
-        shrines = Utils.deepCopy(generated.shrines),
-        safeZones = Utils.deepCopy(generated.safeZones),
-        darkZones = Utils.deepCopy(generated.darkZones),
-        hazards = Utils.deepCopy(generated.hazards),
-        monsters = monsters,
-        player = player,
-    }
-
-    return world
+    game.selectedDifficulty = game.difficultyNames[currentIndex]
+    buildTitleItems()
 end
 
 local function setRunMessage(text)
@@ -245,43 +211,37 @@ local function setRunMessage(text)
     end
 end
 
-local function registerRunEvents()
-    Events.clear()
-    Events.on(Events.GAME_EVENTS.KEY_COLLECTED, function()
-        setRunMessage("A key steadies your nerves.")
-    end)
-    Events.on(Events.GAME_EVENTS.ITEM_COLLECTED, function(itemKind)
-        setRunMessage("Recovered " .. itemKind)
-    end)
-    Events.on(Events.GAME_EVENTS.ITEM_USED, function(itemKind)
-        setRunMessage("Used " .. itemKind)
-    end)
-    Events.on(Events.GAME_EVENTS.MONSTER_KILLED, function(monsterType)
-        setRunMessage("Silenced a " .. monsterType)
-    end)
-    Events.on(Events.GAME_EVENTS.PLAYER_DEATH, function()
-        setRunMessage("The halls finally caught up.")
-    end)
+local function coordKey(coord)
+    return string.format("%d:%d", coord[1], coord[2])
+end
+
+local function stationLabel(station)
+    if station.hasWorkbench and station.hasCuring then
+        return "Workbench / Curing Rack"
+    elseif station.hasWorkbench then
+        return "Workbench"
+    end
+    return "Curing Rack"
 end
 
 local function buildReplayContext(run)
     return {
-        fogEnabled = run.runtime.fogEnabled,
-        timeAttackEnabled = run.runtime.timeAttack.enabled,
-        player = {
-            baseSpeed = run.world.player.baseSpeed,
-            speedBonus = run.world.player.speedBonus,
-            inventorySize = run.world.player.inventorySize,
-            attackDamage = run.world.player.attackDamage,
-            visionBonus = run.world.player.visionBonus,
-            extraLife = run.world.player.extraLife,
-            wardCharges = run.world.player.wardCharges,
+        mode = run.mode,
+        isDaily = run.mode == "daily",
+        dailySeed = run.mode == "daily" and run.seed or nil,
+        sourceMode = run.sourceMode,
+        weather = {
+            current = run.world.weather.current,
+            hoursUntilChange = run.world.weather.hoursUntilChange,
         },
-        effects = {
-            invincibility = Effects.activeEffects.invincibility,
-            invincibilityTimer = Effects.activeEffects.invincibilityTimer,
-            ghostSlow = Effects.activeEffects.ghostSlow,
-            ghostSlowTimer = Effects.activeEffects.ghostSlowTimer,
+        timeOfDay = run.world.timeOfDay,
+        dayCount = run.world.dayCount,
+        worldSource = run.world.source,
+        player = {
+            maxCondition = run.player.maxCondition,
+            carryCapacity = run.player.carryCapacity,
+            equippedTool = run.player.equippedTool,
+            equippedWeapon = run.player.equippedWeapon,
         },
     }
 end
@@ -291,20 +251,23 @@ local function refreshReplayEntries()
     for _, file in ipairs(Replay.listReplays()) do
         local replay = Replay.inspect(file)
         if replay then
+            local replayMode = replay.context and replay.context.mode or (replay.context and replay.context.isDaily and "daily" or "survival")
             local details = string.format(
-                "%s | %s | %.1fs",
+                "%s | %s | %s | %.1fs",
                 replay.metadata.recordingDate ~= "" and replay.metadata.recordingDate or "Unknown date",
-                replay.difficulty or "normal",
+                formatModeLabel(replayMode),
+                titleCase(canonicalDifficultyName(replay.difficulty)),
                 replay.metadata.duration or 0
             )
+            if replay.context and replay.context.isDaily and replay.context.dailySeed then
+                details = details .. string.format(" | seed %s", tostring(replay.context.dailySeed))
+            end
             table.insert(entries, {
                 file = file,
                 details = details,
-                metadata = replay.metadata,
             })
         end
     end
-
     game.replayScreen.entries = entries
     if game.replayScreen.index > #entries then
         game.replayScreen.index = #entries
@@ -319,75 +282,191 @@ local function saveReplaySnapshot()
         setRunMessage("Playback runs cannot be re-saved.")
         return false
     end
-
     if not Replay.hasData() then
-        setRunMessage("No replay data to save yet.")
+        setRunMessage("No replay data to save.")
         return false
     end
-
-    local success = Replay.save()
-    if success then
+    if Replay.save() then
         refreshReplayEntries()
         setRunMessage("Replay saved.")
         return true
     end
-
     setRunMessage("Replay save failed.")
     return false
 end
 
-local function computeVisionRadius()
-    local run = game.run
-    local player = run.world.player
-    local effects = run.runtime.sanityEffects
-    local radius = CONFIG.VISION_BASE_RADIUS + player.visionBonus - effects.visionPenalty
-    if run.runtime.sanityStatus and run.runtime.sanityStatus.inDarkZone then
-        radius = radius - 1
+local function createRun(generated, difficultyName, options)
+    local sourceMode = options.mode or "survival"
+    if options.replayMode then
+        sourceMode = (options.context and options.context.mode) or (options.context and options.context.isDaily and "daily") or "survival"
     end
-    return Utils.clamp(radius, CONFIG.VISION_MIN_RADIUS, 12)
+    local run = {
+        difficultyName = canonicalDifficultyName(difficultyName),
+        mode = options.replayMode and "replay" or sourceMode,
+        sourceMode = sourceMode,
+        world = Utils.deepCopy(generated),
+        player = Survival.createPlayer(Progression.getFeats()),
+        stats = {
+            daysSurvived = generated.dayCount,
+            firesLit = 0,
+            metersWalked = 0,
+            wolvesRepelled = 0,
+            clothingRepairs = 0,
+            waterBoiled = 0,
+            meatCooked = 0,
+        },
+        runtime = {
+            message = "",
+            messageTimer = 0,
+            causeOfDeath = "exposure",
+            currentVisibleTiles = {},
+            interactionHint = "",
+            craftMenuOpen = false,
+            craftIndex = 1,
+            craftRecipes = {},
+            alerts = {
+                wolfThreat = 0,
+                blizzard = 0,
+                fireRisk = 0,
+                weakIce = 0,
+            },
+            pendingShake = nil,
+            currentPOI = nil,
+            stations = {},
+            currentStation = nil,
+            discoveryToast = "",
+            discoveryToastTimer = 0,
+        },
+        finished = false,
+        replayMode = options.replayMode or false,
+        replayProgress = 0,
+        feats = Progression.getFeats(),
+        startedAt = love.timer.getTime(),
+    }
+
+    run.player.coord = {generated.playerStart[1], generated.playerStart[2]}
+    run.player.lastSafeCoord = {generated.playerStart[1], generated.playerStart[2]}
+    run.world.traps = run.world.traps or {}
+    run.world.carcasses = run.world.carcasses or {}
+    run.world.fishingSpots = run.world.fishingSpots or {}
+    run.world.climbNodes = run.world.climbNodes or {}
+    run.world.mapNodes = run.world.mapNodes or {}
+    run.world.workbenches = run.world.workbenches or {}
+    run.world.curingStations = run.world.curingStations or {}
+    run.world.curing = run.world.curing or {}
+    run.world.mappedTiles = run.world.mappedTiles or {}
+    run.world.pointsOfInterest = run.world.pointsOfInterest or {}
+    run.world.discoveredPOIs = run.world.discoveredPOIs or {}
+
+    if options.context then
+        local context = options.context
+        if context.weather then
+            run.world.weather.current = context.weather.current or run.world.weather.current
+            run.world.weather.hoursUntilChange = context.weather.hoursUntilChange or run.world.weather.hoursUntilChange
+        end
+        if context.timeOfDay then
+            run.world.timeOfDay = context.timeOfDay
+        end
+        if context.dayCount then
+            run.world.dayCount = context.dayCount
+            run.stats.daysSurvived = context.dayCount
+        end
+        if context.player then
+            run.player.maxCondition = context.player.maxCondition or run.player.maxCondition
+            run.player.carryCapacity = context.player.carryCapacity or run.player.carryCapacity
+            run.player.equippedTool = context.player.equippedTool or run.player.equippedTool
+            run.player.equippedWeapon = context.player.equippedWeapon or run.player.equippedWeapon
+            run.player.condition = math.min(run.player.condition, run.player.maxCondition)
+        end
+    end
+
+    return run
 end
 
-local function updateVisibility()
-    local run = game.run
-    run.runtime.currentVisibleTiles = {}
+local function pointOfInterestKey(poi)
+    local gridX, gridY = Utils.pixelToGrid(poi.coord[1], poi.coord[2])
+    return string.format("%s@%d:%d", poi.name or "POI", gridX, gridY)
+end
 
-    if not run.runtime.fogEnabled then
-        return
+local function discoverPointOfInterest(run, poi)
+    local key = pointOfInterestKey(poi)
+    if run.world.discoveredPOIs[key] then
+        return false
     end
+    run.world.discoveredPOIs[key] = true
+    run.runtime.discoveryToast = poi.name or "Point of interest"
+    run.runtime.discoveryToastTimer = 2.4
+    SoundEvents.play("poi_discovery")
+    return true
+end
 
-    local playerTileX = math.floor(run.world.player.coord[1] / CONFIG.TILE_SIZE) + 1
-    local playerTileY = math.floor(run.world.player.coord[2] / CONFIG.TILE_SIZE) + 1
-    local radius = computeVisionRadius()
+local function updatePointOfInterestState(run)
+    run.runtime.currentPOI = nil
+    local nearestDistance = math.huge
 
-    for dy = -radius, radius do
-        for dx = -radius, radius do
-            if math.sqrt((dx * dx) + (dy * dy)) <= radius then
-                local tx = playerTileX + dx
-                local ty = playerTileY + dy
-                if run.world.grid[ty] and run.world.grid[ty][tx] then
-                    local key = tx .. ":" .. ty
-                    run.runtime.currentVisibleTiles[key] = true
-                    run.runtime.seenTiles[key] = true
-                end
+    for _, poi in ipairs(run.world.pointsOfInterest or {}) do
+        local gridX, gridY = Utils.pixelToGrid(poi.coord[1], poi.coord[2])
+        local tileX = gridX + 1
+        local tileY = gridY + 1
+        if isVisibleTile(tileX, tileY) or isMappedTile(tileX, tileY) then
+            discoverPointOfInterest(run, poi)
+        end
+
+        if run.world.discoveredPOIs[pointOfInterestKey(poi)] then
+            local distance = Utils.distance(run.player.coord[1], run.player.coord[2], poi.coord[1], poi.coord[2])
+            if distance <= CONFIG.TILE_SIZE * 3 and distance < nearestDistance then
+                nearestDistance = distance
+                run.runtime.currentPOI = poi.name
             end
         end
     end
 end
 
-local function isVisibleTile(gridX, gridY)
-    local run = game.run
-    if not run.runtime.fogEnabled then
-        return true
+local function discoverMappedPointOfInterest(run, centerCoord, radiusTiles)
+    local radius = radiusTiles * CONFIG.TILE_SIZE
+    for _, poi in ipairs(run.world.pointsOfInterest or {}) do
+        if Utils.distance(centerCoord[1], centerCoord[2], poi.coord[1], poi.coord[2]) <= radius then
+            discoverPointOfInterest(run, poi)
+        end
     end
-    return run.runtime.currentVisibleTiles[gridX .. ":" .. gridY] == true
 end
 
-local function hasSeenTile(gridX, gridY)
-    local run = game.run
-    if not run.runtime.fogEnabled then
-        return true
+local function updateVisibility()
+    if not game.run then
+        return
     end
-    return run.runtime.seenTiles[gridX .. ":" .. gridY] == true
+    local run = game.run
+    local radius = Survival.visibleRadius(run)
+    run.runtime.currentVisibleTiles = {}
+    run.world.mappedTiles = run.world.mappedTiles or {}
+    local px, py = Utils.pixelToGrid(run.player.coord[1], run.player.coord[2])
+    for dy = -radius, radius do
+        for dx = -radius, radius do
+            if math.sqrt((dx * dx) + (dy * dy)) <= radius then
+                local gx = px + dx + 1
+                local gy = py + dy + 1
+                if run.world.grid[gy] and run.world.grid[gy][gx] then
+                    run.runtime.currentVisibleTiles[gx .. ":" .. gy] = true
+                    run.world.mappedTiles[gx .. ":" .. gy] = true
+                end
+            end
+        end
+    end
+    updatePointOfInterestState(run)
+end
+
+isVisibleTile = function(x, y)
+    if not game.run then
+        return false
+    end
+    return game.run.runtime.currentVisibleTiles[x .. ":" .. y] == true
+end
+
+isMappedTile = function(x, y)
+    if not game.run or not game.run.world.mappedTiles then
+        return false
+    end
+    return game.run.world.mappedTiles[x .. ":" .. y] == true
 end
 
 local function startNewRun(options)
@@ -398,91 +477,38 @@ local function startNewRun(options)
     if Replay.isPlaying() then
         Replay.stopPlayback()
     end
-    love.audio.stop(sounds.walking)
-    love.audio.stop(sounds.ghost)
 
-    local difficulty = options.difficulty or game.selectedDifficulty
-    local seed = Utils.setGameSeed(
-        options.useDailyChallenge ~= nil and options.useDailyChallenge or game.settings.gameplay.dailyChallenge,
-        options.seed
-    )
-    local generated = ProcGen.generateRunData(difficulty)
-    local fogEnabled = options.fogEnabled
-    if fogEnabled == nil then
-        fogEnabled = game.settings.gameplay.fog
-    end
-    if CONFIG.DIFFICULTY_SETTINGS[difficulty].forcedFog then
-        fogEnabled = true
-    end
+    local difficulty = canonicalDifficultyName(options.difficulty or game.selectedDifficulty)
+    local mode = options.replayMode and "replay" or (options.mode or (options.useDailyChallenge and "daily" or "survival"))
+    local seed = Utils.setGameSeed(options.useDailyChallenge or false, options.seed)
+    local generated = ProcGen.generateRunData(difficulty, {
+        layout = options.editorLayout,
+    })
+    local run = createRun(generated, difficulty, {
+        replayMode = options.replayMode,
+        context = options.context,
+        mode = mode,
+    })
 
-    local timeAttackEnabled = options.timeAttackEnabled
-    if timeAttackEnabled == nil then
-        timeAttackEnabled = game.settings.gameplay.timeAttack
-    end
-
-    Effects.resetRun()
-    Combat.init()
-    Animation.init()
-
-    local run = {
-        seed = seed,
-        difficultyName = difficulty,
-        world = createRuntimeWorld(generated, difficulty),
-        runtime = {
-            fogEnabled = fogEnabled,
-            minimapEnabled = game.settings.gameplay.minimap,
-            currentVisibleTiles = {},
-            seenTiles = {},
-            message = "",
-            messageTimer = 0,
-            sanityEffects = Sanity.getEffects({sanity = CONFIG.SANITY_MAX, panicActive = false}),
-            sanityStatus = nil,
-            timeAttack = {
-                enabled = timeAttackEnabled,
-                startTime = love.timer.getTime(),
-                elapsed = 0,
-                lastIncrease = 0,
-                parTime = CONFIG.TIME_ATTACK_PAR_TIMES[difficulty],
-            },
-        },
-        stats = {
-            startTime = love.timer.getTime(),
-            finishTime = love.timer.getTime(),
-            keysCollected = 0,
-            monstersKilled = 0,
-            itemsCollected = 0,
-            itemsUsed = 0,
-            deaths = 0,
-        },
-        finished = false,
-        replayMode = options.replayMode or false,
-        replayProgress = 0,
-    }
-
+    run.seed = seed
     game.run = run
-    if not run.replayMode then
-        Progression.applyStartingUnlocks(run)
-    end
-    if options.playerContext then
-        for key, value in pairs(options.playerContext) do
-            run.world.player[key] = value
-        end
-    end
-    if options.effectContext then
-        for key, value in pairs(options.effectContext) do
-            Effects.activeEffects[key] = value
-        end
-    end
-    registerRunEvents()
-    Animation.initGhostBobbing(#run.world.monsters)
     game.input.heldKeys = {}
+    updateVisibility()
+    refreshCraftMenu()
+    updateRunSignals()
+    SoundEvents.updateWeather(run.world.weather.current)
+
     if run.replayMode then
-        run.runtime.message = "Replay playback"
-        run.runtime.messageTimer = 2.2
+        run.runtime.message = string.format("%s replay playback", formatModeLabel(run.sourceMode))
+        run.runtime.messageTimer = 2
     else
         Replay.startRecording(seed, difficulty, buildReplayContext(run))
+        if generated.source == "editor" then
+            run.runtime.message = "Editor playtest"
+            run.runtime.messageTimer = 2
+        end
     end
-    updateVisibility()
+
     game.screen = "game"
 end
 
@@ -493,127 +519,79 @@ local function returnToTitle()
     if Replay.isPlaying() then
         Replay.stopPlayback()
     end
-    love.audio.stop(sounds.walking)
-    love.audio.stop(sounds.ghost)
+    SoundEvents.stop("walking")
+    SoundEvents.updateWeather(nil)
     game.run = nil
     game.input.heldKeys = {}
-    game.screen = "title"
     game.pauseIndex = 1
+    game.screen = "title"
     refreshReplayEntries()
 end
 
-local function finalizeRun(won)
+local function finalizeDeath()
     local run = game.run
     if not run or run.finished then
         return
     end
-
     run.finished = true
-    run.stats.finishTime = love.timer.getTime()
+    run.player.alive = false
     Replay.stopRecording()
     Replay.stopPlayback()
-    love.audio.stop(sounds.walking)
-    love.audio.stop(sounds.ghost)
+    SoundEvents.stop("walking")
+    SoundEvents.updateWeather(nil)
     if not run.replayMode then
-        Progression.recordRun({
-            won = won,
-            deaths = run.stats.deaths,
-            keysCollected = run.stats.keysCollected,
-            monstersKilled = run.stats.monstersKilled,
-            itemsCollected = run.stats.itemsCollected,
-            timeTaken = run.stats.finishTime - run.stats.startTime,
-        })
+        Progression.recordRun(run.stats)
     end
-    game.screen = won and "win" or "lose"
+    Effects.startScreenShake(game.settings.gameplay.screenShake, CONFIG.SCREEN_SHAKE_INTENSITY * 1.2, CONFIG.SCREEN_SHAKE_DURATION * 1.5)
+    SoundEvents.play("player_death")
+    game.screen = "death"
 end
 
-local function useInventorySlot(slot)
-    local run = game.run
-    local item = run.world.player.inventory[slot]
-    if not item then
+local function setDoorState()
+    if not game.run then
         return
     end
-
-    Effects.applyItem(run, item.kind)
-    table.remove(run.world.player.inventory, slot)
-    run.stats.itemsUsed = run.stats.itemsUsed + 1
-    love.audio.play(sounds.item)
-    Events.trigger(Events.GAME_EVENTS.ITEM_USED, item.kind)
-end
-
-local function addItemToInventory(item)
-    local player = game.run.world.player
-    if #player.inventory < player.inventorySize then
-        table.insert(player.inventory, item)
-        return true
-    end
-    return false
-end
-
-local function dropMonsterLoot(monster)
-    local world = game.run.world
-    local roll = math.random()
-    if monster.lootBias == "key" and roll < 0.35 then
-        table.insert(world.keys, {coord = {monster.coord[1], monster.coord[2]}})
-        world.totalKeys = world.totalKeys + 1
-    else
-        local kind = "calming_tonic"
-        if monster.lootBias == "ward" or (monster.lootBias == "item" and roll > 0.66) then
-            kind = "ward_charge"
-        elseif monster.lootBias == "item" and roll > 0.33 then
-            kind = "speed_tonic"
+    for _, structure in ipairs(game.run.world.structures or {}) do
+        if structure.type == "cabin" then
+            local doorCoord = {(structure.door.x - 1) * CONFIG.TILE_SIZE, (structure.door.y - 1) * CONFIG.TILE_SIZE}
+            local isNear = Utils.distance(game.run.player.coord[1], game.run.player.coord[2], doorCoord[1], doorCoord[2]) <= CONFIG.TILE_SIZE * 1.2
+            if isNear ~= structure.doorOpen then
+                structure.doorOpen = isNear
+                if isNear then
+                    SoundEvents.play("door_open")
+                end
+            end
         end
-        table.insert(world.items, {
-            coord = {monster.coord[1], monster.coord[2]},
-            kind = kind,
-        })
     end
 end
 
-local function consumeEmergencySave()
-    local player = game.run.world.player
-    if player.extraLife and player.extraLife > 0 then
-        player.extraLife = player.extraLife - 1
-        player.sanity = math.max(player.sanity, 30)
-        Effects.activeEffects.invincibility = true
-        Effects.activeEffects.invincibilityTimer = 2
-        return true
-    end
-
-    if player.wardCharges and player.wardCharges > 0 then
-        player.wardCharges = player.wardCharges - 1
-        Sanity.restore(player, CONFIG.SANITY_WARD_RECOVERY)
-        Effects.activeEffects.invincibility = true
-        Effects.activeEffects.invincibilityTimer = 1.5
-        return true
-    end
-
-    return false
-end
-
-local function killPlayer()
+local function currentTileAtCoord(coord)
     local run = game.run
-    if Effects.activeEffects.invincibility then
-        return
-    end
-    if consumeEmergencySave() then
-        setRunMessage("A last reserve keeps you moving.")
-        return
-    end
-
-    run.world.player.alive = false
-    run.stats.deaths = run.stats.deaths + 1
-    Effects.spawn(run.world.player.coord[1], run.world.player.coord[2], "death")
-    Effects.startScreenShake(game.settings.gameplay.screenShake, CONFIG.SCREEN_SHAKE_INTENSITY * 1.6, 0.45)
-    love.audio.play(sounds.playerDeath)
-    Events.trigger(Events.GAME_EVENTS.PLAYER_DEATH)
+    local gx, gy = Utils.pixelToGrid(coord[1], coord[2])
+    local row = run.world.grid[gy + 1]
+    return row and row[gx + 1], gx + 1, gy + 1
 end
 
-local function rectanglesOverlap(a, b)
-    return a[1] + CONFIG.TILE_SIZE > b[1]
-        and a[1] < b[1] + CONFIG.TILE_SIZE
-        and a[2] + CONFIG.TILE_SIZE > b[2]
-        and a[2] < b[2] + CONFIG.TILE_SIZE
+local function tileAtRunCoord(run, coord)
+    local gx, gy = Utils.pixelToGrid(coord[1], coord[2])
+    local row = run.world.grid[gy + 1]
+    return row and row[gx + 1], gx + 1, gy + 1
+end
+
+local function canOccupy(coord)
+    local corners = {
+        {coord[1], coord[2]},
+        {coord[1] + CONFIG.TILE_SIZE - 2, coord[2]},
+        {coord[1], coord[2] + CONFIG.TILE_SIZE - 2},
+        {coord[1] + CONFIG.TILE_SIZE - 2, coord[2] + CONFIG.TILE_SIZE - 2},
+    }
+    for _, corner in ipairs(corners) do
+        local tile = currentTileAtCoord(corner)
+        if not Survival.isWalkableTile(tile) then
+            return false
+        end
+    end
+    return true
 end
 
 local function isMovementKeyDown(...)
@@ -626,21 +604,30 @@ local function isMovementKeyDown(...)
         end
         return false
     end
-
     return love.keyboard.isDown(...)
 end
 
+local function getMoveSpeed(isSprinting)
+    local player = game.run.player
+    local overweight = math.max(0, player.carryWeight - player.carryCapacity)
+    local speed = CONFIG.PLAYER_WALK_SPEED
+    if player.afflictions.sprain then
+        speed = speed - CONFIG.SPRAIN_MOVE_PENALTY
+        isSprinting = false
+    end
+    if overweight >= CONFIG.BADLY_OVERWEIGHT_THRESHOLD then
+        speed = CONFIG.PLAYER_BADLY_OVERWEIGHT_SPEED
+    elseif overweight > 0 then
+        speed = CONFIG.PLAYER_OVERWEIGHT_SPEED
+    elseif isSprinting then
+        speed = CONFIG.PLAYER_SPRINT_SPEED
+    end
+    return Accessibility.getAdjustedSpeed(game.settings, speed)
+end
+
 local function movePlayer(dt)
-    local run = game.run
-    local player = run.world.player
-    local sanityEffects = run.runtime.sanityEffects
-
-    local speed = player.baseSpeed + player.speedBonus
-    speed = speed * sanityEffects.playerSpeedMultiplier
-    speed = Accessibility.getAdjustedSpeed(game.settings, speed)
-
-    local dx = 0
-    local dy = 0
+    local player = game.run.player
+    local dx, dy = 0, 0
     if isMovementKeyDown("w", "up") then
         dy = dy - 1
     end
@@ -654,107 +641,574 @@ local function movePlayer(dt)
         dx = dx + 1
     end
 
+    local sprinting = isMovementKeyDown("lshift", "rshift")
+    if player.afflictions.sprain or math.max(0, player.carryWeight - player.carryCapacity) > 0 then
+        sprinting = false
+    end
     local moved = dx ~= 0 or dy ~= 0
-    if moved then
-        local length = math.sqrt((dx * dx) + (dy * dy))
-        dx = dx / length
-        dy = dy / length
-        player.lastMoveX = dx
-        player.lastMoveY = dy
+    if not moved then
+        SoundEvents.stop("walking")
+        return false
+    end
 
-        local previous = {player.coord[1], player.coord[2]}
-        player.coord[1] = player.coord[1] + (dx * speed * dt)
-        player.coord[2] = player.coord[2] + (dy * speed * dt)
+    local length = math.sqrt((dx * dx) + (dy * dy))
+    dx = dx / length
+    dy = dy / length
+    player.lastMoveX = dx
+    player.lastMoveY = dy
 
-        for _, wall in ipairs(run.world.walls) do
-            if rectanglesOverlap(player.coord, wall) then
-                player.coord = previous
-                break
-            end
+    local speed = getMoveSpeed(sprinting)
+    local previous = {player.coord[1], player.coord[2]}
+    local target = {
+        player.coord[1] + (dx * speed * dt),
+        player.coord[2] + (dy * speed * dt),
+    }
+
+    if canOccupy(target) then
+        player.coord = target
+        local tile = currentTileAtCoord(player.coord)
+        if tile ~= "weak_ice" and tile ~= "ice" then
+            player.lastSafeCoord = {player.coord[1], player.coord[2]}
         end
+        game.run.stats.metersWalked = game.run.stats.metersWalked + (speed * dt / CONFIG.TILE_SIZE)
+    else
+        player.coord = previous
+    end
 
-        if not sounds.walking:isPlaying() then
-            sounds.walking:setLooping(true)
-            love.audio.play(sounds.walking)
+    if not SoundEvents.isPlaying("walking") then
+        SoundEvents.play("walking")
+    end
+    return sprinting
+end
+
+local function gatherNode(node)
+    for _, item in ipairs(node.loot or {}) do
+        Items.add(game.run.player.inventory, item.kind, item.quantity or 1)
+    end
+    Items.sortInventory(game.run.player.inventory)
+    Survival.updateCarryWeight(game.run.player)
+    SoundEvents.play("item_pickup")
+end
+
+local function findNearbyNode()
+    for index, node in ipairs(game.run.world.resourceNodes or {}) do
+        local distance = Utils.distance(game.run.player.coord[1], game.run.player.coord[2], node.coord[1], node.coord[2])
+        if distance <= CONFIG.TILE_SIZE * 1.2 then
+            return node, index
         end
-    elseif sounds.walking:isPlaying() then
-        love.audio.stop(sounds.walking)
+    end
+    return nil
+end
+
+local function findNearbySnowShelter()
+    for _, shelter in ipairs(game.run.world.snowShelters or {}) do
+        local distance = Utils.distance(game.run.player.coord[1], game.run.player.coord[2], shelter.coord[1], shelter.coord[2])
+        if distance <= CONFIG.TILE_SIZE * 1.2 then
+            return shelter
+        end
+    end
+    return nil
+end
+
+local function findNearbyCoordEntry(list)
+    for index, entry in ipairs(list or {}) do
+        local distance = Utils.distance(game.run.player.coord[1], game.run.player.coord[2], entry.coord[1], entry.coord[2])
+        if distance <= CONFIG.TILE_SIZE * 1.2 then
+            return entry, index
+        end
+    end
+    return nil
+end
+
+refreshCraftMenu = function()
+    if not game.run then
+        return
+    end
+    game.run.runtime.craftRecipes = Survival.availableCraftRecipes(game.run)
+    if game.run.runtime.craftIndex > #game.run.runtime.craftRecipes then
+        game.run.runtime.craftIndex = #game.run.runtime.craftRecipes
+    end
+    if game.run.runtime.craftIndex < 1 then
+        game.run.runtime.craftIndex = 1
     end
 end
 
-local function processCombat()
-    local run = game.run
-    local player = run.world.player
+applyPendingShake = function()
+    local pending = game.run and game.run.runtime.pendingShake
+    if not pending then
+        if game.run and game.run.runtime.pendingPulse then
+            Effects.addPulse(game.run.runtime.pendingPulse.kind, game.run.runtime.pendingPulse.coord)
+            game.run.runtime.pendingPulse = nil
+        end
+        return
+    end
+    Effects.startScreenShake(
+        game.settings.gameplay.screenShake,
+        pending.intensity or CONFIG.SCREEN_SHAKE_INTENSITY,
+        pending.duration or CONFIG.SCREEN_SHAKE_DURATION
+    )
+    game.run.runtime.pendingShake = nil
+    if game.run and game.run.runtime.pendingPulse then
+        Effects.addPulse(game.run.runtime.pendingPulse.kind, game.run.runtime.pendingPulse.coord)
+        game.run.runtime.pendingPulse = nil
+    end
+end
 
-    if Combat.isAttacking then
-        local attackBox = Combat.getAttackHitbox(player.coord)
-        for index = #run.world.monsters, 1, -1 do
-            local monster = run.world.monsters[index]
-            if Combat.checkAttackHit(attackBox, monster.coord) then
-                local died = Combat.hitMonster(monster, player.attackDamage)
-                Effects.startScreenShake(game.settings.gameplay.screenShake, CONFIG.SCREEN_SHAKE_INTENSITY, 0.18)
-                if died then
-                    Effects.spawn(monster.coord[1], monster.coord[2], "death")
-                    dropMonsterLoot(monster)
-                    run.stats.monstersKilled = run.stats.monstersKilled + 1
-                    Events.trigger(Events.GAME_EVENTS.MONSTER_KILLED, monster.type)
-                    table.remove(run.world.monsters, index)
-                end
-                break
-            end
+local function rebuildStationView(run)
+    local stationsByKey = {}
+    local function ensureStation(coord)
+        local key = coordKey(coord)
+        if not stationsByKey[key] then
+            stationsByKey[key] = {
+                coord = {coord[1], coord[2]},
+                hasWorkbench = false,
+                hasCuring = false,
+                curingCount = 0,
+                readyCount = 0,
+            }
+        end
+        return stationsByKey[key]
+    end
+
+    for _, workbench in ipairs(run.world.workbenches or {}) do
+        local station = ensureStation(workbench.coord)
+        station.hasWorkbench = true
+    end
+    for _, rack in ipairs(run.world.curingStations or {}) do
+        local station = ensureStation(rack.coord)
+        station.hasCuring = true
+    end
+    for _, curing in ipairs(run.world.curing or {}) do
+        local station = ensureStation(curing.coord)
+        station.hasCuring = true
+        if curing.hoursRemaining <= 0 then
+            station.readyCount = station.readyCount + 1
+        else
+            station.curingCount = station.curingCount + 1
         end
     end
 
-    for _, monster in ipairs(run.world.monsters) do
-        if rectanglesOverlap(player.coord, monster.coord) then
-            killPlayer()
+    local stations = {}
+    local nearestStation
+    local nearestDistance = math.huge
+    for _, station in pairs(stationsByKey) do
+        station.label = stationLabel(station)
+        station.state = station.readyCount > 0 and "ready" or (station.curingCount > 0 and "curing" or "idle")
+        local tile = tileAtRunCoord(run, station.coord)
+        station.overlayOnly = tile == "cabin_workbench"
+        table.insert(stations, station)
+
+        local distance = Utils.distance(run.player.coord[1], run.player.coord[2], station.coord[1], station.coord[2])
+        if distance <= CONFIG.TILE_SIZE * 1.2 and distance < nearestDistance then
+            nearestDistance = distance
+            nearestStation = station
+        end
+    end
+
+    table.sort(stations, function(left, right)
+        if left.coord[2] == right.coord[2] then
+            return left.coord[1] < right.coord[1]
+        end
+        return left.coord[2] < right.coord[2]
+    end)
+
+    run.runtime.stations = stations
+    run.runtime.currentStation = nearestStation
+end
+
+updateRunSignals = function()
+    local run = game.run
+    if not run then
+        return
+    end
+
+    rebuildStationView(run)
+
+    local node = findNearbyNode()
+    local shelter = findNearbySnowShelter()
+    local trap = Wildlife.findNearbyTrap(run)
+    local carcass = Wildlife.findNearbyCarcass(run)
+    local fishingSpot = findNearbyCoordEntry(run.world.fishingSpots)
+    local climbNode = findNearbyCoordEntry(run.world.climbNodes)
+    local mapNode = findNearbyCoordEntry(run.world.mapNodes)
+    local currentStation = run.runtime.currentStation
+    local alerts = {
+        wolfThreat = 0,
+        blizzard = 0,
+        fireRisk = 0,
+        weakIce = 0,
+    }
+
+    local tile = Survival.currentTile(run)
+    if tile == "weak_ice" or (run.player.weakIceHours or 0) > 0 then
+        alerts.weakIce = 0.9
+    end
+
+    local sheltered = Survival.isSheltered(run, run.player.coord)
+    if run.world.weather.current == "blizzard" and not sheltered then
+        alerts.blizzard = 0.55
+    end
+
+    local nearestFire, fireDistance = Fire.findNearest(run)
+    local fireNearby = nearestFire
+        and fireDistance <= CONFIG.FIRE_HEAT_RADIUS_TILES * CONFIG.TILE_SIZE
+        and nearestFire.remainingBurnHours > 0
+
+    if not sheltered and run.player.warmth < 35 and not fireNearby then
+        alerts.fireRisk = Utils.clamp((35 - run.player.warmth) / 35, 0.2, 1)
+    end
+
+    local wolfAlertDistance = CONFIG.WOLF_DETECTION_RADIUS_TILES * CONFIG.TILE_SIZE
+    for _, wolf in ipairs(run.world.wildlife.wolves or {}) do
+        local distance = Utils.distance(run.player.coord[1], run.player.coord[2], wolf.coord[1], wolf.coord[2])
+        if distance <= wolfAlertDistance then
+            local intensity = Utils.clamp(1 - (distance / wolfAlertDistance), 0.2, 1)
+            if wolf.state == "charge" then
+                intensity = 1
+            elseif wolf.state == "stalk" then
+                intensity = math.max(intensity, 0.65)
+            end
+            alerts.wolfThreat = math.max(alerts.wolfThreat, intensity)
+        end
+    end
+
+    if tile == "weak_ice" then
+        run.runtime.interactionHint = "Move off the weak ice."
+    elseif trap and trap.state == "caught" then
+        run.runtime.interactionHint = "E collect rabbit from the snare."
+    elseif carcass then
+        run.runtime.interactionHint = "E harvest the carcass."
+    elseif fishingSpot then
+        run.runtime.interactionHint = "E fish the hole."
+    elseif climbNode then
+        run.runtime.interactionHint = "E climb the rope."
+    elseif mapNode and Items.count(run.player.inventory, "charcoal") > 0 then
+        run.runtime.interactionHint = "M map the area with charcoal."
+    elseif currentStation then
+        if currentStation.hasWorkbench and currentStation.hasCuring then
+            if currentStation.state == "ready" then
+                run.runtime.interactionHint = "C craft at the Workbench / Curing Rack. E collect cured items."
+            else
+                run.runtime.interactionHint = "C craft at the Workbench / Curing Rack. X hang fresh hides or gut to cure."
+            end
+        elseif currentStation.hasWorkbench then
+            run.runtime.interactionHint = "C craft at the Workbench."
+        elseif currentStation.state == "ready" then
+            run.runtime.interactionHint = "E collect cured items."
+        else
+            run.runtime.interactionHint = "X hang fresh hides or gut to cure."
+        end
+    elseif node and not node.opened then
+        if node.type == "wood" then
+            run.runtime.interactionHint = "E gather wood."
+        elseif node.type == "cache" then
+            run.runtime.interactionHint = "E open the supply cache."
+        else
+            run.runtime.interactionHint = "E scavenge supplies."
+        end
+    elseif run.runtime.craftMenuOpen then
+        run.runtime.interactionHint = "Crafting."
+    elseif shelter then
+        run.runtime.interactionHint = "R rest, X repair or dismantle shelter."
+    elseif fireNearby then
+        run.runtime.interactionHint = "E cook or boil. F feed the fire."
+    elseif Survival.canSleepAt(run) then
+        run.runtime.interactionHint = "R rest here."
+    elseif run.player.equippedWeapon == "bow" and Items.count(run.player.inventory, "arrow") > 0 then
+        run.runtime.interactionHint = "Space loose an arrow."
+    elseif run.world.weather.current == "blizzard" and not sheltered then
+        run.runtime.interactionHint = "Find shelter or light a fire."
+    else
+        run.runtime.interactionHint = ""
+    end
+
+    run.runtime.alerts = alerts
+end
+
+local function interact()
+    local trap = Wildlife.findNearbyTrap(game.run)
+    if trap and trap.state == "caught" then
+        local ok, message = Wildlife.collectTrap(game.run)
+        setRunMessage(message)
+        refreshCraftMenu()
+        if ok then
+            SoundEvents.play("snare_catch")
+        end
+        return ok
+    end
+
+    local carcass = Wildlife.findNearbyCarcass(game.run)
+    if carcass then
+        local ok, message = Wildlife.harvestNearbyCarcass(game.run)
+        setRunMessage(message)
+        updateVisibility()
+        updateRunSignals()
+        refreshCraftMenu()
+        if ok then
+            SoundEvents.play("harvest")
+        end
+        return ok
+    end
+
+    local fishingSpot = findNearbyCoordEntry(game.run.world.fishingSpots)
+    if fishingSpot then
+        local ok, message = Wildlife.fish(game.run)
+        setRunMessage(message)
+        updateVisibility()
+        updateRunSignals()
+        if ok then
+            SoundEvents.play("fish_catch")
+        end
+        return ok
+    end
+
+    local climbNode = findNearbyCoordEntry(game.run.world.climbNodes)
+    if climbNode then
+        local ok, message = Survival.useRopeClimb(game.run)
+        setRunMessage(message)
+        applyPendingShake()
+        updateVisibility()
+        updateRunSignals()
+        if ok then
+            SoundEvents.play("rope_climb")
+        end
+        return ok
+    end
+
+    local curingStation = findNearbyCoordEntry(game.run.world.curingStations)
+    if curingStation then
+        local ok, message = Survival.collectCuredItems(game.run)
+        if not ok then
+            ok, message = Survival.startCuring(game.run)
+        end
+        setRunMessage(message)
+        refreshCraftMenu()
+        return ok
+    end
+
+    local node, index = findNearbyNode()
+    if node and not node.opened then
+        node.opened = true
+        gatherNode(node)
+        if node.type ~= "cache" then
+            table.remove(game.run.world.resourceNodes, index)
+        end
+        if node.type == "wood" then
+            setRunMessage("You break down some wood.")
+        elseif node.type == "cache" then
+            setRunMessage("You open a supply cache.")
+        else
+            setRunMessage("You scavenge the area.")
+        end
+        return
+    end
+
+    local ok, message = Fire.interact(game.run)
+    if ok or message ~= "No fire to work from." then
+        setRunMessage(message)
+        return
+    end
+
+    if Survival.canSleepAt(game.run) then
+        setRunMessage("You can rest here. Press R.")
+    else
+        setRunMessage("Nothing useful nearby.")
+    end
+end
+
+local function performContextAction()
+    local trap = Wildlife.findNearbyTrap(game.run)
+    if trap then
+        if trap.state == "caught" then
+            local ok, message = Wildlife.collectTrap(game.run)
+            setRunMessage(message)
+            refreshCraftMenu()
+            if ok then
+                SoundEvents.play("snare_catch")
+            end
+            return ok
+        end
+    end
+
+    local ok, message = Wildlife.placeSnare(game.run)
+    if ok then
+        setRunMessage(message)
+        refreshCraftMenu()
+        SoundEvents.play("snare_set")
+        return ok
+    end
+
+    ok, message = Survival.dismantleSnowShelter(game.run)
+    if not ok then
+        ok, message = Survival.repairSnowShelter(game.run)
+    end
+    if ok then
+        setRunMessage(message)
+        refreshCraftMenu()
+        return ok
+    end
+
+    ok, message = Survival.collectCuredItems(game.run)
+    if not ok then
+        ok, message = Survival.startCuring(game.run)
+    end
+    setRunMessage(message)
+    refreshCraftMenu()
+    return ok
+end
+
+local function performFireAction()
+    local nearestFire, distance = Fire.findNearest(game.run)
+    if nearestFire and distance <= CONFIG.FIRE_HEAT_RADIUS_TILES * CONFIG.TILE_SIZE then
+        local ok, message = Fire.feed(game.run)
+        if not ok then
+            ok, message = Fire.interact(game.run)
+        end
+        Survival.updateCarryWeight(game.run.player)
+        setRunMessage(message)
+        return ok
+    end
+
+    local ok, message = Fire.start(game.run, love.keyboard.isDown("lshift", "rshift"))
+    Survival.updateCarryWeight(game.run.player)
+    if not ok then
+        Effects.startScreenShake(game.settings.gameplay.screenShake, CONFIG.SCREEN_SHAKE_INTENSITY * 0.7, CONFIG.SCREEN_SHAKE_DURATION)
+    end
+    setRunMessage(message)
+    return ok
+end
+
+local function simulateHours(hours, sleeping)
+    local steps = math.max(1, math.floor(hours / 0.25))
+    local stepHours = hours / steps
+    for _ = 1, steps do
+        if not game.run.player.alive then
             break
         end
+        Survival.advanceTime(game.run, stepHours)
+        Fire.update(game.run, stepHours)
+        Wildlife.update(game.run, stepHours)
+        Survival.update(game.run, stepHours, {sleeping = sleeping})
+        setDoorState()
+        applyPendingShake()
+    end
+    updateVisibility()
+    refreshCraftMenu()
+    updateRunSignals()
+    if game.run.player.condition <= 0 or not game.run.player.alive then
+        finalizeDeath()
     end
 end
 
-local function processPickups()
-    local run = game.run
-    local player = run.world.player
-
-    for index = #run.world.items, 1, -1 do
-        local item = run.world.items[index]
-        if rectanglesOverlap(player.coord, item.coord) then
-            if addItemToInventory(item) then
-                Effects.spawn(item.coord[1], item.coord[2], "item")
-                table.remove(run.world.items, index)
-                run.stats.itemsCollected = run.stats.itemsCollected + 1
-                love.audio.play(sounds.item)
-                Events.trigger(Events.GAME_EVENTS.ITEM_COLLECTED, item.kind)
-            end
-        end
+local function rest()
+    if not Survival.canSleepAt(game.run) then
+        setRunMessage("You need a bed, bedroll, cave, or shelter.")
+        return
     end
 
-    for index = #run.world.keys, 1, -1 do
-        local key = run.world.keys[index]
-        if rectanglesOverlap(player.coord, key.coord) then
-            Effects.spawn(key.coord[1], key.coord[2], "key")
-            table.remove(run.world.keys, index)
-            player.overallKeyCount = player.overallKeyCount + 1
-            run.stats.keysCollected = run.stats.keysCollected + 1
-            Sanity.restore(player, CONFIG.SANITY_KEY_RECOVERY)
-            love.audio.play(sounds.key)
-            Events.trigger(Events.GAME_EVENTS.KEY_COLLECTED, key.coord)
+    simulateHours(CONFIG.SLEEP_REST_HOURS, true)
+    if game.run and game.run.player.alive then
+        if game.run.feats.Beddown then
+            game.run.player.fatigue = Utils.clamp(game.run.player.fatigue + 8, 0, CONFIG.MAX_FATIGUE)
         end
+        setRunMessage("You sleep for a short stretch.")
     end
+end
+
+local function toggleCraftMenu()
+    if not Survival.isSheltered(game.run, game.run.player.coord) and not Survival.isWorkbenchNearby(game.run) then
+        local ok, message = Survival.craftSnowShelter(game.run)
+        setRunMessage(message)
+        refreshCraftMenu()
+        if ok then
+            SoundEvents.play("craft")
+        end
+        return ok
+    end
+
+    game.run.runtime.craftMenuOpen = not game.run.runtime.craftMenuOpen
+    refreshCraftMenu()
+    if game.run.runtime.craftMenuOpen then
+        setRunMessage("Crafting open.")
+    else
+        setRunMessage("Crafting closed.")
+    end
+    return true
+end
+
+local function toggleBow()
+    if game.run.player.equippedWeapon == "bow" then
+        game.run.player.equippedWeapon = nil
+        setRunMessage("You lower the bow.")
+        return true
+    end
+
+    if Items.count(game.run.player.inventory, "bow") > 0 then
+        game.run.player.equippedWeapon = "bow"
+        setRunMessage("You ready the bow.")
+        SoundEvents.play("bow_ready")
+        return true
+    end
+
+    setRunMessage("No bow in your pack.")
+    return false
 end
 
 local function handleGameplayActionKey(key)
-    if key == "space" then
-        Combat.tryAttack(game.run.world.player.lastMoveX, game.run.world.player.lastMoveY)
-    elseif key == "1" then
-        useInventorySlot(1)
-    elseif key == "2" then
-        useInventorySlot(2)
-    elseif key == "3" then
-        useInventorySlot(3)
-    elseif key == "4" then
-        useInventorySlot(4)
+    if key == "e" then
+        interact()
+    elseif key == "f" then
+        performFireAction()
+    elseif key == "r" then
+        rest()
+    elseif key == "c" then
+        toggleCraftMenu()
+    elseif key == "x" then
+        performContextAction()
+    elseif key == "h" then
+        local ok, message = Survival.repairWorstClothing(game.run)
+        setRunMessage(message)
+        refreshCraftMenu()
+    elseif key == "t" then
+        local ok, message = Survival.autoTreat(game.run)
+        setRunMessage(message)
+        if ok then
+            SoundEvents.play("treat")
+        end
+    elseif key == "m" then
+        local ok, message = Survival.mapArea(game.run)
+        setRunMessage(message)
+        applyPendingShake()
+        updateVisibility()
+        if ok then
+            local mapNode = findNearbyCoordEntry(game.run.world.mapNodes)
+            if mapNode then
+                discoverMappedPointOfInterest(game.run, mapNode.coord, CONFIG.MAP_REVEAL_RADIUS)
+            end
+        end
+        updateRunSignals()
+        if ok then
+            SoundEvents.play("map_reveal")
+        end
+    elseif key == "b" then
+        toggleBow()
+    elseif key == "space" then
+        local canFireBow = game.run.player.equippedWeapon == "bow" and Items.count(game.run.player.inventory, "arrow") > 0
+        local ok, message = Wildlife.fireBow(game.run)
+        setRunMessage(message)
+        if canFireBow then
+            SoundEvents.play("bow_fire")
+        end
+        if ok then
+            SoundEvents.play("arrow_hit")
+        end
+    else
+        local index = tonumber(key)
+        if index then
+            local ok, message = Survival.consumeInventoryIndex(game.run, index)
+            setRunMessage(message)
+            refreshCraftMenu()
+        end
     end
 end
 
@@ -782,10 +1236,18 @@ local function updateGame(dt)
         applyReplayInput(replayInput)
     end
     run.replayProgress = Replay.getPlaybackProgress()
+    SoundEvents.updateWeather(run.world.weather.current)
+
     if run.runtime.messageTimer > 0 then
         run.runtime.messageTimer = run.runtime.messageTimer - dt
         if run.runtime.messageTimer <= 0 then
             run.runtime.message = ""
+        end
+    end
+    if run.runtime.discoveryToastTimer > 0 then
+        run.runtime.discoveryToastTimer = run.runtime.discoveryToastTimer - dt
+        if run.runtime.discoveryToastTimer <= 0 then
+            run.runtime.discoveryToast = ""
         end
     end
 
@@ -793,70 +1255,40 @@ local function updateGame(dt)
         return
     end
 
-    Animation.update(dt)
-    Combat.update(dt)
-    Effects.updateItemEffects(run, dt)
-    Effects.updateParticles(dt)
-    Effects.updateScreenShake(dt)
+    Effects.update(dt)
 
-    if run.runtime.timeAttack.enabled then
-        run.runtime.timeAttack.elapsed = love.timer.getTime() - run.runtime.timeAttack.startTime
-        if run.runtime.timeAttack.elapsed - run.runtime.timeAttack.lastIncrease >= CONFIG.TIME_ATTACK_SPEED_INCREASE_INTERVAL then
-            run.runtime.timeAttack.lastIncrease = run.runtime.timeAttack.elapsed
-            for _, monster in ipairs(run.world.monsters) do
-                monster.speed = monster.speed + CONFIG.TIME_ATTACK_SPEED_INCREASE_AMOUNT
-            end
-        end
+    if run.runtime.craftMenuOpen then
+        updateVisibility()
+        updateRunSignals()
+        return
     end
 
-    movePlayer(dt)
-    local aiSummary = AI.updateMonsters(run.world.monsters, run.world.player, run.world, {sanityEffects = run.runtime.sanityEffects}, dt)
-    if aiSummary.newDetections > 0 then
-        Sanity.applyShock(run.world.player, CONFIG.SANITY_DETECTION_SPIKE * aiSummary.newDetections)
-        setRunMessage("Something found you.")
-    end
-
-    local hazardResult = Hazards.update(run.world.hazards, run.world.player, dt)
-    if hazardResult.cursedTriggered then
-        Sanity.applyShock(run.world.player, hazardResult.sanityShock)
-        setRunMessage("A cursed room tears at your sanity.")
-    end
-    if hazardResult.spikeTriggered then
-        setRunMessage("A trap snaps shut.")
-    end
-
-    processCombat()
-    if hazardResult.playerKilled then
-        killPlayer()
-    end
-    processPickups()
-
-    run.runtime.sanityStatus = Sanity.update(run.world.player, run.world, {fogEnabled = run.runtime.fogEnabled}, dt)
-    run.runtime.sanityEffects = run.runtime.sanityStatus.effects
-
+    local sprinting = movePlayer(dt)
+    local hours = dt * CONFIG.GAME_HOURS_PER_REAL_SECOND
+    Survival.advanceTime(run, hours)
+    Fire.update(run, hours)
+    Wildlife.update(run, hours)
+    Survival.update(run, hours, {sprinting = sprinting})
+    setDoorState()
+    applyPendingShake()
     updateVisibility()
-    Audio.updateGhostAudio(game.settings, sounds.ghost, run.world.player.coord, run.world.monsters, run.runtime.sanityEffects)
-    Audio.updateAmbientMusic(game.settings, sounds.ambient, run.world.player.alive, run.runtime.sanityEffects)
+    refreshCraftMenu()
+    updateRunSignals()
 
-    if run.world.player.overallKeyCount >= run.world.totalKeys and run.world.totalKeys > 0 then
-        love.audio.play(sounds.door)
-        finalizeRun(true)
-    elseif not run.world.player.alive then
-        finalizeRun(false)
+    if run.player.condition <= 0 or not run.player.alive then
+        finalizeDeath()
     end
 end
 
-local function drawTileSprite(sprite, variant, x, y, tint)
-    local image = sprite[variant]
-    Accessibility.setColor(game.settings, tint[1], tint[2], tint[3], tint[4] or 1)
-    love.graphics.draw(image, x, y)
+local function drawTile(tile, drawX, drawY)
+    SpriteRegistry.drawTile(sprites, tile, drawX, drawY, game.settings)
 end
 
 local function drawWorld()
     local run = game.run
     local world = run.world
 
-    love.graphics.clear(0.06, 0.06, 0.06, 1)
+    love.graphics.clear(0.02, 0.05, 0.08, 1)
     love.graphics.push()
     if Effects.screenShake.active then
         love.graphics.translate(Effects.screenShake.offsetX, Effects.screenShake.offsetY)
@@ -864,224 +1296,126 @@ local function drawWorld()
 
     for y = 1, #world.grid do
         for x = 1, #world.grid[y] do
-            local visible = isVisibleTile(x, y)
-            local seen = hasSeenTile(x, y)
-            if visible or seen then
-                local alpha = visible and 1 or 0.3
+            if isVisibleTile(x, y) or isMappedTile(x, y) then
                 local drawX = (x - 1) * CONFIG.TILE_SIZE
                 local drawY = (y - 1) * CONFIG.TILE_SIZE
-
-                drawTileSprite(sprites.floor, world.floorVariants[y][x], drawX, drawY, {0.85, 0.85, 0.85, alpha})
-                if world.grid[y][x] == 1 then
-                    drawTileSprite(sprites.wall, world.wallVariants[y][x], drawX, drawY, {0.82, 0.82, 0.82, alpha})
+                drawTile(world.grid[y][x], drawX, drawY)
+                if not isVisibleTile(x, y) then
+                    Accessibility.setColor(game.settings, 0, 0, 0, 0.58)
+                    love.graphics.rectangle("fill", drawX, drawY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE)
                 end
             end
         end
     end
 
-    for _, zone in ipairs(world.darkZones) do
-        Accessibility.setColor(game.settings, 0.05, 0.05, 0.05, 0.28)
-        love.graphics.rectangle("fill", zone.x, zone.y, zone.width, zone.height)
-    end
-
-    for _, zone in ipairs(world.safeZones) do
-        Accessibility.setColor(game.settings, 0.18, 0.32, 0.18, 0.1)
-        love.graphics.rectangle("fill", zone.x, zone.y, zone.width, zone.height)
-    end
-
-    Hazards.draw(world.hazards, game.settings, isVisibleTile)
-
-    for _, shrine in ipairs(world.shrines) do
-        Accessibility.setColor(game.settings, 0.5, 0.95, 0.7, 0.9)
-        love.graphics.circle("fill", shrine[1] + (CONFIG.TILE_SIZE / 2), shrine[2] + (CONFIG.TILE_SIZE / 2), 6)
-    end
-
-    for _, item in ipairs(world.items) do
-        Accessibility.setColor(game.settings, 0.9, 0.9, 0.9, 1)
-        love.graphics.draw(sprites.item, item.coord[1], item.coord[2])
-    end
-
-    for _, key in ipairs(world.keys) do
-        Accessibility.setColor(game.settings, 0.95, 0.95, 0.95, 1)
-        love.graphics.draw(sprites.chest, key.coord[1], key.coord[2])
-    end
-
-    for index, monster in ipairs(world.monsters) do
-        local style = AI.getDrawStyle(monster)
-        local bob = Animation.getGhostBobOffset(index, love.timer.getTime()) * style.bob
-        local sprite = (monster.type == "patrol_warden" or monster.type == "wailer" or monster.type == "stalker") and sprites.ghost[2] or sprites.ghost[1]
-        Accessibility.setColor(game.settings, style.color[1], style.color[2], style.color[3], style.color[4])
-        love.graphics.draw(sprite, monster.coord[1], monster.coord[2] + bob)
-    end
-
-    if world.player.alive then
-        local scale = Animation.getPlayerIdleScale()
-        local ox = sprites.player:getWidth() / 2
-        local oy = sprites.player:getHeight() / 2
-        if Effects.activeEffects.invincibility then
-            Accessibility.setColor(game.settings, 1, 1, 0.4, 1)
-        else
-            Accessibility.setColor(game.settings, 0.95, 0.95, 0.95, 1)
+    for _, structure in ipairs(world.structures or {}) do
+        if structure.type == "cabin" and isVisibleTile(structure.door.x, structure.door.y) then
+            SpriteRegistry.drawDoor(sprites, structure.doorOpen,
+                (structure.door.x - 1) * CONFIG.TILE_SIZE,
+                (structure.door.y - 1) * CONFIG.TILE_SIZE,
+                game.settings)
         end
-        love.graphics.draw(sprites.player, world.player.coord[1] + ox, world.player.coord[2] + oy, 0, scale, scale, ox, oy)
-    else
-        Accessibility.setColor(game.settings, 1, 1, 1, 1)
-        love.graphics.draw(sprites.deadPlayer, world.player.coord[1], world.player.coord[2])
     end
 
-    Effects.drawParticles()
+    for _, shelter in ipairs(world.snowShelters or {}) do
+        local gx, gy = Utils.pixelToGrid(shelter.coord[1], shelter.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawTile(sprites, "snow_shelter", shelter.coord[1], shelter.coord[2], game.settings)
+        end
+    end
+
+    for _, node in ipairs(world.resourceNodes or {}) do
+        local gx, gy = Utils.pixelToGrid(node.coord[1], node.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawResourceNode(sprites, node, game.settings)
+        end
+    end
+
+    for _, fire in ipairs(world.fires or {}) do
+        local gx, gy = Utils.pixelToGrid(fire.coord[1], fire.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawFire(sprites, fire, game.settings, love.timer.getTime())
+        end
+    end
+
+    for _, trap in ipairs(world.traps or {}) do
+        local gx, gy = Utils.pixelToGrid(trap.coord[1], trap.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawTrap(sprites, trap, game.settings)
+        end
+    end
+
+    for _, carcass in ipairs(world.carcasses or {}) do
+        local gx, gy = Utils.pixelToGrid(carcass.coord[1], carcass.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawCarcass(sprites, carcass, game.settings)
+        end
+    end
+
+    for _, spot in ipairs(world.fishingSpots or {}) do
+        local gx, gy = Utils.pixelToGrid(spot.coord[1], spot.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawWorldMarker(sprites, "fishing", spot.coord, game.settings)
+        end
+    end
+
+    for _, node in ipairs(world.climbNodes or {}) do
+        local gx, gy = Utils.pixelToGrid(node.coord[1], node.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawWorldMarker(sprites, "climb", node.coord, game.settings)
+        end
+    end
+
+    for _, node in ipairs(world.mapNodes or {}) do
+        local gx, gy = Utils.pixelToGrid(node.coord[1], node.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawWorldMarker(sprites, "map", node.coord, game.settings)
+        end
+    end
+
+    for _, station in ipairs(run.runtime.stations or {}) do
+        local gx, gy = Utils.pixelToGrid(station.coord[1], station.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawStation(sprites, station, game.settings)
+        end
+    end
+
+    for _, wolf in ipairs(world.wildlife.wolves or {}) do
+        local gx, gy = Utils.pixelToGrid(wolf.coord[1], wolf.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawWildlife(sprites, wolf, game.settings)
+        end
+    end
+    for _, rabbit in ipairs(world.wildlife.rabbits or {}) do
+        local gx, gy = Utils.pixelToGrid(rabbit.coord[1], rabbit.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawWildlife(sprites, rabbit, game.settings)
+        end
+    end
+    for _, deer in ipairs(world.wildlife.deer or {}) do
+        local gx, gy = Utils.pixelToGrid(deer.coord[1], deer.coord[2])
+        if isVisibleTile(gx + 1, gy + 1) then
+            SpriteRegistry.drawWildlife(sprites, deer, game.settings)
+        end
+    end
+
+    love.graphics.setFont(fonts.small)
+    for _, poi in ipairs(world.pointsOfInterest or {}) do
+        local gx, gy = Utils.pixelToGrid(poi.coord[1], poi.coord[2])
+        local key = pointOfInterestKey(poi)
+        if world.discoveredPOIs[key] and (isVisibleTile(gx + 1, gy + 1) or isMappedTile(gx + 1, gy + 1)) then
+            Accessibility.setColor(game.settings, 0.92, 0.95, 1, isVisibleTile(gx + 1, gy + 1) and 0.95 or 0.62)
+            love.graphics.print(poi.name, poi.coord[1] - 4, poi.coord[2] - 14)
+        end
+    end
+
+    Effects.drawWorldOverlay(game.settings, run)
+    SpriteRegistry.drawPlayer(sprites, run.player.alive, run.player.coord, game.settings)
+
     love.graphics.pop()
-
-    UI.drawHUD(run, fonts, game.settings)
-    if run.runtime.minimapEnabled and not run.runtime.sanityEffects.minimapDisabled then
-        UI.drawMinimap(run, game.settings)
-    end
-    UI.drawSanityOverlay(run, fonts, game.settings)
-    Accessibility.drawAudioIndicator(game.settings, run.world.player.coord, run.world.monsters)
-
-    if run.runtime.timeAttack.enabled then
-        local adjusted = run.runtime.timeAttack.elapsed
-        local text = string.format("TIME %02d:%02d / PAR %02d:%02d",
-            math.floor(adjusted / 60),
-            math.floor(adjusted % 60),
-            math.floor(run.runtime.timeAttack.parTime / 60),
-            math.floor(run.runtime.timeAttack.parTime % 60)
-        )
-        Accessibility.setColor(game.settings, 1, 1, 1, 1)
-        love.graphics.setFont(fonts.small)
-        love.graphics.print(text, 10, 176)
-    end
-
-    if run.runtime.message ~= "" then
-        Accessibility.setColor(game.settings, 1, 0.92, 0.38, 1)
-        love.graphics.setFont(fonts.small)
-        love.graphics.print(run.runtime.message, 10, CONFIG.WINDOW_HEIGHT - 28)
-    end
-
-    if game.debugToolsEnabled then
-        Accessibility.setColor(game.settings, 1, 1, 1, 1)
-        love.graphics.setFont(fonts.small)
-        love.graphics.print("FPS: " .. love.timer.getFPS(), CONFIG.WINDOW_WIDTH - 80, 10)
-        love.graphics.print("Seed: " .. tostring(run.seed), CONFIG.WINDOW_WIDTH - 150, 34)
-        love.graphics.print("Monsters: " .. #world.monsters, CONFIG.WINDOW_WIDTH - 120, 58)
-    end
-end
-
-function love.load()
-    love.window.setTitle(string.format("%s v%s", CONFIG.WINDOW_TITLE, CONFIG.VERSION))
-    love.window.setMode(CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT)
-
-    game.settings = Settings.load()
-    Progression.load()
-
-    rebuildFonts()
-    buildTitleItems()
-    refreshSettingsOptions()
-
-    sprites.player = love.graphics.newImage("sprite/player-default.png")
-    sprites.deadPlayer = love.graphics.newImage("sprite/player-tombstone.png")
-    sprites.ghost = {
-        love.graphics.newImage("sprite/ghost-1.png"),
-        love.graphics.newImage("sprite/ghost-2.png"),
-    }
-    sprites.item = love.graphics.newImage("sprite/potion-1.png")
-    sprites.chest = love.graphics.newImage("sprite/closed-chest.png")
-    sprites.floor = {
-        love.graphics.newImage("sprite/floor-stone-1.png"),
-        love.graphics.newImage("sprite/floor-stone-2.png"),
-    }
-    sprites.wall = {
-        love.graphics.newImage("sprite/dirt-wall-1.png"),
-        love.graphics.newImage("sprite/dirt-wall-2.png"),
-        love.graphics.newImage("sprite/dirt-wall-3.png"),
-    }
-
-    sounds.ambient = love.audio.newSource("sound/ambient-background.mp3", "stream")
-    sounds.walking = love.audio.newSource("sound/player-walking.mp3", "static")
-    sounds.playerDeath = love.audio.newSource("sound/player-death.mp3", "static")
-    sounds.item = love.audio.newSource("sound/player-collect-item.mp3", "static")
-    sounds.key = love.audio.newSource("sound/player-collect-key.mp3", "static")
-    sounds.door = love.audio.newSource("sound/door-open.mp3", "static")
-    sounds.ghost = love.audio.newSource("sound/ghost-scream.mp3", "static")
-
-    sounds.ambient:setLooping(true)
-    love.audio.play(sounds.ambient)
-    applyAudioSettings()
-
-    Effects.init()
-    Editor.init()
-    Replay.init()
-    refreshReplayEntries()
-end
-
-function love.update(dt)
-    if Editor.isActive() then
-        Editor.update(dt)
-        return
-    end
-
-    if game.screen == "game" then
-        updateGame(dt)
-    elseif game.screen == "pause" and game.run then
-        Effects.updateParticles(dt)
-        Effects.updateScreenShake(dt)
-    end
-end
-
-function love.draw()
-    if Editor.isActive() then
-        Editor.draw()
-        return
-    end
-
-    if game.screen == "title" then
-        UI.drawTitleScreen(game, fonts, game.settings)
-    elseif game.screen == "settings" then
-        UI.drawSettingsScreen(game.settingsScreen, fonts, game.settings)
-    elseif game.screen == "progression" then
-        UI.drawProgressionScreen(Progression.data, fonts, game.settings)
-    elseif game.screen == "replays" then
-        UI.drawReplayScreen(game.replayScreen, fonts, game.settings)
-    elseif game.screen == "game" then
-        drawWorld()
-    elseif game.screen == "pause" then
-        drawWorld()
-        UI.drawPauseScreen(game.pauseOptions, game.pauseIndex, fonts, game.settings)
-    elseif game.screen == "win" then
-        UI.drawWinScreen(game.run, fonts, game.settings)
-    elseif game.screen == "lose" then
-        UI.drawLoseScreen(game.run, fonts, game.settings)
-    end
-end
-
-local function cycleDifficulty(direction)
-    local currentIndex = 1
-    for index, name in ipairs(game.difficultyNames) do
-        if name == game.selectedDifficulty then
-            currentIndex = index
-            break
-        end
-    end
-    currentIndex = currentIndex + direction
-    if currentIndex < 1 then
-        currentIndex = #game.difficultyNames
-    elseif currentIndex > #game.difficultyNames then
-        currentIndex = 1
-    end
-    game.selectedDifficulty = game.difficultyNames[currentIndex]
-    buildTitleItems()
-end
-
-local function adjustTitleValue(direction)
-    if game.titleIndex == 2 then
-        cycleDifficulty(direction)
-    elseif game.titleIndex == 3 then
-        Settings.set("gameplay.dailyChallenge", not game.settings.gameplay.dailyChallenge)
-        persistSettings()
-    elseif game.titleIndex == 4 then
-        Settings.set("gameplay.timeAttack", not game.settings.gameplay.timeAttack)
-        persistSettings()
-    end
+    UI.drawHUD(run, fonts, game.settings, sprites)
+    UI.drawCraftMenu(run, fonts, game.settings)
+    Accessibility.drawVisualAlerts(game.settings, run.runtime.alerts, love.timer.getTime())
 end
 
 local function openSettings(previousScreen)
@@ -1100,38 +1434,104 @@ local function startReplayFromSelection()
     if not entry then
         return false
     end
-
     if not Replay.load(entry.file) then
         return false
     end
-
     local replay = Replay.inspect(entry.file)
     if not replay then
         return false
     end
-
-    local context = replay.context or {}
-
     startNewRun({
-        difficulty = replay.difficulty or game.selectedDifficulty,
+        difficulty = canonicalDifficultyName(replay.difficulty or game.selectedDifficulty),
         seed = replay.seed,
-        useDailyChallenge = false,
         replayMode = true,
-        fogEnabled = context.fogEnabled,
-        timeAttackEnabled = context.timeAttackEnabled,
-        playerContext = context.player,
-        effectContext = context.effects,
+        context = replay.context or {},
     })
-    local ok = Replay.startPlayback()
-    if not ok then
-        return false
+    return Replay.startPlayback()
+end
+
+function love.load()
+    love.window.setTitle(string.format("%s v%s", CONFIG.WINDOW_TITLE, CONFIG.VERSION))
+    love.window.setMode(CONFIG.WINDOW_WIDTH, CONFIG.WINDOW_HEIGHT)
+
+    game.settings = Settings.load()
+    Progression.load()
+
+    rebuildFonts()
+    buildTitleItems()
+    refreshSettingsOptions()
+
+    sprites = SpriteRegistry.load()
+    SoundEvents.init()
+    SoundEvents.load()
+    applyAudioSettings()
+    SoundEvents.play("ambient")
+
+    Effects.init()
+    Editor.init()
+    Editor.setPlaytestCallback(function(layout)
+        startNewRun({
+            editorLayout = layout,
+            mode = "survival",
+        })
+    end)
+    Replay.init()
+    refreshReplayEntries()
+
+    love._tikritDebug = {
+        getGameState = function()
+            return game
+        end,
+        getSoundEventLog = function()
+            return SoundEvents.getEventLog()
+        end,
+        startEditorPlaytest = function(layout)
+            startNewRun({
+                editorLayout = layout,
+                mode = "survival",
+            })
+        end,
+    }
+end
+
+function love.update(dt)
+    if Editor.isActive() then
+        Editor.update(dt)
+        return
     end
-    return true
+
+    if game.screen == "game" then
+        updateGame(dt)
+    end
+end
+
+function love.draw()
+    if Editor.isActive() then
+        Editor.draw()
+        return
+    end
+
+    if game.screen == "title" then
+        UI.drawTitleScreen(game, fonts, game.settings)
+    elseif game.screen == "settings" then
+        UI.drawSettingsScreen(game.settingsScreen, fonts, game.settings)
+    elseif game.screen == "profile" then
+        UI.drawProfileScreen(Progression.data, fonts, game.settings)
+    elseif game.screen == "replays" then
+        UI.drawReplayScreen(game.replayScreen, fonts, game.settings)
+    elseif game.screen == "game" then
+        drawWorld()
+    elseif game.screen == "pause" then
+        drawWorld()
+        UI.drawPauseScreen(game.pauseOptions, game.pauseIndex, fonts, game.settings)
+    elseif game.screen == "death" then
+        UI.drawDeathScreen(game.run, fonts, game.settings)
+    end
 end
 
 function love.keypressed(key)
     if Replay.isRecording() and game.screen == "game" then
-        Replay.recordKeyState(key, true, love.timer.getTime() - game.run.stats.startTime)
+        Replay.recordKeyState(key, true, love.timer.getTime() - game.run.startedAt)
     end
 
     if Editor.isActive() then
@@ -1139,12 +1539,7 @@ function love.keypressed(key)
         return
     end
 
-    if key == "f3" then
-        game.debugToolsEnabled = not game.debugToolsEnabled
-        return
-    end
-
-    if key == "f5" and game.debugToolsEnabled then
+    if key == "f5" and game.screen ~= "game" then
         Editor.toggle()
         return
     end
@@ -1161,46 +1556,29 @@ function love.keypressed(key)
             game.titleIndex = math.max(1, game.titleIndex - 1)
         elseif key == "down" then
             game.titleIndex = math.min(#game.titleItems, game.titleIndex + 1)
-        elseif key == "left" then
-            adjustTitleValue(-1)
-        elseif key == "right" then
-            adjustTitleValue(1)
+        elseif key == "left" and game.titleIndex == 2 then
+            cycleDifficulty(-1)
+        elseif key == "right" and game.titleIndex == 2 then
+            cycleDifficulty(1)
         elseif key == "return" then
             if game.titleIndex == 1 then
                 startNewRun()
             elseif game.titleIndex == 2 then
                 cycleDifficulty(1)
-            elseif game.titleIndex == 3 or game.titleIndex == 4 then
-                adjustTitleValue(1)
-            elseif game.titleIndex == 5 then
+            elseif game.titleIndex == 3 then
+                startNewRun({useDailyChallenge = true})
+            elseif game.titleIndex == 4 then
                 openSettings("title")
-            elseif game.titleIndex == 6 then
+            elseif game.titleIndex == 5 then
                 game.previousScreen = "title"
-                game.screen = "progression"
-            elseif game.titleIndex == 7 then
+                game.screen = "profile"
+            elseif game.titleIndex == 6 then
                 openReplayScreen()
-            elseif game.titleIndex == 8 then
+            elseif game.titleIndex == 7 then
                 love.event.quit()
             end
         elseif key == "escape" then
             love.event.quit()
-        end
-        return
-    end
-
-    if game.screen == "replays" then
-        if key == "up" then
-            game.replayScreen.index = math.max(1, game.replayScreen.index - 1)
-        elseif key == "down" then
-            game.replayScreen.index = math.min(#game.replayScreen.entries, game.replayScreen.index + 1)
-        elseif key == "r" then
-            refreshReplayEntries()
-        elseif key == "return" then
-            if startReplayFromSelection() then
-                return
-            end
-        elseif key == "escape" then
-            game.screen = "title"
         end
         return
     end
@@ -1218,27 +1596,58 @@ function love.keypressed(key)
             if option then
                 adjustSetting(option.definition, key == "left" and -1 or 1)
             end
-        elseif key == "r" then
-            Settings.resetDefaults()
-            persistSettings()
         elseif key == "escape" then
             game.screen = game.previousScreen
         end
         return
     end
 
-    if game.screen == "progression" then
+    if game.screen == "profile" then
         if key == "escape" or key == "return" then
             game.screen = game.previousScreen
         end
         return
     end
 
+    if game.screen == "replays" then
+        if key == "up" then
+            game.replayScreen.index = math.max(1, game.replayScreen.index - 1)
+        elseif key == "down" then
+            game.replayScreen.index = math.min(#game.replayScreen.entries, game.replayScreen.index + 1)
+        elseif key == "r" then
+            refreshReplayEntries()
+        elseif key == "return" then
+            startReplayFromSelection()
+        elseif key == "escape" then
+            game.screen = "title"
+        end
+        return
+    end
+
     if game.screen == "game" then
-        if key == "p" or key == "escape" then
-            love.audio.stop(sounds.walking)
-            game.screen = "pause"
+        if game.run and game.run.runtime.craftMenuOpen then
+            if key == "up" then
+                game.run.runtime.craftIndex = math.max(1, game.run.runtime.craftIndex - 1)
+            elseif key == "down" then
+                game.run.runtime.craftIndex = math.min(#game.run.runtime.craftRecipes, game.run.runtime.craftIndex + 1)
+            elseif key == "return" then
+                local recipe = game.run.runtime.craftRecipes[game.run.runtime.craftIndex]
+                if recipe then
+                    local ok, message = Survival.craftRecipe(game.run, recipe.key)
+                    setRunMessage(message)
+                    refreshCraftMenu()
+                    if ok then
+                        SoundEvents.play("craft")
+                    end
+                end
+            elseif key == "escape" or key == "c" then
+                game.run.runtime.craftMenuOpen = false
+                updateRunSignals()
+            end
             return
+        end
+        if key == "escape" or key == "p" then
+            game.screen = "pause"
         else
             handleGameplayActionKey(key)
         end
@@ -1262,13 +1671,13 @@ function love.keypressed(key)
             elseif game.pauseIndex == 5 then
                 returnToTitle()
             end
-        elseif key == "p" or key == "escape" then
+        elseif key == "escape" or key == "p" then
             game.screen = "game"
         end
         return
     end
 
-    if game.screen == "win" or game.screen == "lose" then
+    if game.screen == "death" then
         if key == "s" and game.run and not game.run.replayMode then
             saveReplaySnapshot()
         elseif key == "return" or key == "escape" then
@@ -1277,15 +1686,18 @@ function love.keypressed(key)
     end
 end
 
-function love.mousereleased(x, y, button)
-    if Editor.isActive() then
-        Editor.mousereleased(x, y, button)
+function love.keyreleased(key)
+    if Replay.isRecording() and game.screen == "game" then
+        Replay.recordKeyState(key, false, love.timer.getTime() - game.run.startedAt)
+    end
+    if Replay.isPlaying() and game.screen == "game" then
+        game.input.heldKeys[key] = nil
     end
 end
 
-function love.keyreleased(key)
-    if Replay.isRecording() and game.screen == "game" then
-        Replay.recordKeyState(key, false, love.timer.getTime() - game.run.stats.startTime)
+function love.mousereleased(x, y, button)
+    if Editor.isActive() then
+        Editor.mousereleased(x, y, button)
     end
 end
 

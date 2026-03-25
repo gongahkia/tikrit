@@ -135,7 +135,15 @@ function Utils.isWalkable(gridX, gridY, grid)
         return false
     end
 
-    return tile ~= "#" and tile ~= 1
+    local blocked = {
+        ["#"] = true,
+        ["tree"] = true,
+        ["rock"] = true,
+        ["lake"] = true,
+        ["cabin_wall"] = true,
+        ["cave_wall"] = true,
+    }
+    return tile ~= 1 and blocked[tile] ~= true
 end
 
 function Utils.getDailySeed(dateTable)

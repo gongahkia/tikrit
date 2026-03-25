@@ -1,5 +1,4 @@
 local CONFIG = require("config")
-local Utils = require("modules/utils")
 
 local Accessibility = {}
 
@@ -61,27 +60,29 @@ function Accessibility.getAdjustedFontSize(settings, baseSize)
     return math.floor(baseSize * settings.accessibility.fontScale)
 end
 
-function Accessibility.drawAudioIndicator(settings, playerCoord, monsters)
-    if not settings.accessibility.visualAudioIndicators then
+function Accessibility.drawVisualAlerts(settings, alerts, pulseTime)
+    if not settings.accessibility.visualAlerts then
         return
     end
 
-    local closestDistance = math.huge
-    for _, monster in ipairs(monsters) do
-        local distance = Utils.distance(playerCoord[1], playerCoord[2], monster.coord[1], monster.coord[2])
-        if distance < closestDistance then
-            closestDistance = distance
-        end
-    end
+    local pulse = 0.55 + (((math.sin((pulseTime or 0) * 6) + 1) * 0.5) * 0.45)
+    local layers = {
+        {key = "blizzard", color = {0.76, 0.9, 1.0}, thickness = 5},
+        {key = "fireRisk", color = {1.0, 0.58, 0.12}, thickness = 7},
+        {key = "weakIce", color = {0.32, 0.66, 0.96}, thickness = 8},
+        {key = "wolfThreat", color = {0.98, 0.2, 0.18}, thickness = 6},
+    }
 
-    if closestDistance < CONFIG.GHOST_AUDIO_MAX_DISTANCE then
-        local intensity = 1 - (closestDistance / CONFIG.GHOST_AUDIO_MAX_DISTANCE)
-        Accessibility.setColor(settings, 1, 0.15, 0.15, intensity * 0.45)
-        local thickness = 6
-        love.graphics.rectangle("fill", 0, 0, CONFIG.WINDOW_WIDTH, thickness)
-        love.graphics.rectangle("fill", 0, CONFIG.WINDOW_HEIGHT - thickness, CONFIG.WINDOW_WIDTH, thickness)
-        love.graphics.rectangle("fill", 0, 0, thickness, CONFIG.WINDOW_HEIGHT)
-        love.graphics.rectangle("fill", CONFIG.WINDOW_WIDTH - thickness, 0, thickness, CONFIG.WINDOW_HEIGHT)
+    for _, layer in ipairs(layers) do
+        local intensity = alerts and alerts[layer.key] or 0
+        if intensity and intensity > 0 then
+            local alpha = math.min(0.75, intensity * pulse)
+            Accessibility.setColor(settings, layer.color[1], layer.color[2], layer.color[3], alpha)
+            love.graphics.rectangle("fill", 0, 0, CONFIG.WINDOW_WIDTH, layer.thickness)
+            love.graphics.rectangle("fill", 0, CONFIG.WINDOW_HEIGHT - layer.thickness, CONFIG.WINDOW_WIDTH, layer.thickness)
+            love.graphics.rectangle("fill", 0, 0, layer.thickness, CONFIG.WINDOW_HEIGHT)
+            love.graphics.rectangle("fill", CONFIG.WINDOW_WIDTH - layer.thickness, 0, layer.thickness, CONFIG.WINDOW_HEIGHT)
+        end
     end
 end
 

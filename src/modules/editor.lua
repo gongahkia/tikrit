@@ -3,11 +3,12 @@
 
 local Editor = {}
 local SAVE_DIR = "editor_maps"
+local playtestCallback = nil
 
 -- Editor state
 local state = {
   active = false,
-  gridSize = 40,
+  gridSize = 20,
   currentTool = "#",  -- Default to wall
   mouseGridX = 0,
   mouseGridY = 0,
@@ -15,7 +16,7 @@ local state = {
   zoom = 1,
   map = {},
   mapWidth = 30,
-  mapHeight = 20,
+  mapHeight = 30,
   filename = "custom.txt",
   showGrid = true,
   showHelp = false,
@@ -27,26 +28,29 @@ local state = {
 
 -- Available tools
 Editor.TOOLS = {
-  ["#"] = {name = "Wall", color = {0.5, 0.5, 0.5}},
-  ["."] = {name = "Floor", color = {0.2, 0.2, 0.2}},
-  [" "] = {name = "Empty", color = {0.1, 0.1, 0.1}},
+  ["#"] = {name = "Rock", color = {0.45, 0.45, 0.48}},
+  ["."] = {name = "Snow", color = {0.82, 0.9, 1.0}},
+  [" "] = {name = "Path", color = {0.65, 0.7, 0.74}},
   ["@"] = {name = "Player Start", color = {0.2, 0.8, 0.2}},
-  ["E"] = {name = "Exit", color = {0.8, 0.2, 0.2}},
-  ["k"] = {name = "Key", color = {1, 0.84, 0}},
-  ["G"] = {name = "Ghost", color = {0.7, 0.3, 0.7}},
-  ["H"] = {name = "Health Potion", color = {1, 0.3, 0.3}},
-  ["S"] = {name = "Speed Boost", color = {0.3, 0.8, 1}},
-  ["I"] = {name = "Invincibility", color = {1, 1, 0.3}},
-  ["M"] = {name = "Map Reveal", color = {0.5, 0.5, 1}},
-  ["W"] = {name = "Weapon", color = {0.8, 0.6, 0.2}},
-  ["^"] = {name = "Spike Trap", color = {0.9, 0.1, 0.1}},
-  ["P"] = {name = "Pressure Plate", color = {0.6, 0.4, 0.2}},
-  ["T"] = {name = "Timed Room", color = {1, 0.5, 0}},
-  ["D"] = {name = "Dark Zone", color = {0.1, 0.1, 0.3}}
+  ["C"] = {name = "Cabin", color = {0.55, 0.36, 0.24}},
+  ["V"] = {name = "Cave", color = {0.3, 0.3, 0.34}},
+  ["L"] = {name = "Lake", color = {0.55, 0.75, 0.96}},
+  ["W"] = {name = "Weak Ice", color = {0.42, 0.68, 0.92}},
+  ["O"] = {name = "Loot Node", color = {1, 0.84, 0.2}},
+  ["F"] = {name = "Fire Safe", color = {1, 0.5, 0.1}},
+  ["K"] = {name = "Wolf Spawn", color = {0.7, 0.72, 0.76}},
+  ["R"] = {name = "Rabbit Zone", color = {0.95, 0.95, 0.98}},
+  ["D"] = {name = "Deer Zone", color = {0.56, 0.34, 0.18}},
+  ["H"] = {name = "Snow Shelter", color = {0.85, 0.92, 1.0}},
+  ["B"] = {name = "Workbench", color = {0.5, 0.32, 0.12}},
+  ["I"] = {name = "Fishing Hole", color = {0.3, 0.64, 0.92}},
+  ["P"] = {name = "Rope Climb", color = {0.76, 0.62, 0.38}},
+  ["M"] = {name = "Map Node", color = {0.95, 0.86, 0.52}},
+  ["Q"] = {name = "Carcass Site", color = {0.8, 0.22, 0.16}}
 }
 
 -- Tool order for cycling
-Editor.TOOL_ORDER = {"#", ".", " ", "@", "E", "k", "G", "H", "S", "I", "M", "W", "^", "P", "T", "D"}
+Editor.TOOL_ORDER = {"#", ".", " ", "@", "C", "V", "L", "W", "O", "F", "K", "R", "D", "H", "B", "I", "P", "M", "Q"}
 
 -- Initialize editor
 function Editor.init()
@@ -66,7 +70,7 @@ function Editor.createEmptyMap()
       if y == 0 or y == state.mapHeight - 1 or x == 0 or x == state.mapWidth - 1 then
         state.map[y][x] = "#"
       else
-        state.map[y][x] = " "
+        state.map[y][x] = "."
       end
     end
   end
@@ -227,12 +231,12 @@ function Editor.keypressed(key)
     ["1"] = "#",
     ["2"] = ".",
     ["3"] = "@",
-    ["4"] = "E",
-    ["5"] = "k",
-    ["6"] = "G",
+    ["4"] = "C",
+    ["5"] = "V",
+    ["6"] = "L",
     ["7"] = "H",
-    ["8"] = "^",
-    ["9"] = "P"
+    ["8"] = "K",
+    ["9"] = "O"
   }
   
   if toolKeys[key] then
@@ -252,6 +256,12 @@ function Editor.keypressed(key)
   -- New map
   if key == "f4" then
     Editor.createEmptyMap()
+  end
+
+  if key == "f6" and playtestCallback then
+    state.active = false
+    playtestCallback(Editor.exportLayout())
+    return
   end
   
   -- Undo/Redo
@@ -344,8 +354,10 @@ function Editor.loadMap()
   
   state.map = {}
   local y = 0
+  local maxWidth = 0
   for line in content:gmatch("[^\n]+") do
     state.map[y] = {}
+    maxWidth = math.max(maxWidth, #line)
     for x = 0, #line - 1 do
       state.map[y][x] = line:sub(x + 1, x + 1)
     end
@@ -353,9 +365,7 @@ function Editor.loadMap()
   end
   
   state.mapHeight = y
-  if state.map[0] then
-    state.mapWidth = #state.map[0]
-  end
+  state.mapWidth = math.max(1, maxWidth)
   
   Editor.saveToHistory()
   print("Map loaded from " .. path)
@@ -483,10 +493,17 @@ Tools:
   1-9: Quick select tool
   F: Flood fill
 
-File:
-  F2: Save map
-  F3: Load map
-  F4: New map
+Outdoor Tools:
+  . Snow / # Rock / space Path
+  C Cabin / V Cave / L Lake / W Weak Ice
+  O Loot / F Fire Safe / K Wolf / R Rabbit / D Deer / H Shelter
+  B Workbench / I Fishing / P Rope / M Map / Q Carcass
+
+	File:
+	  F2: Save map
+	  F3: Load map
+	  F4: New map
+	  F6: Playtest current map
 
 Editing:
   Ctrl+Z: Undo
@@ -511,6 +528,57 @@ end
 -- Get current map for export
 function Editor.getMap()
   return state.map
+end
+
+function Editor.exportLayout()
+  local lines = {}
+  for y = 0, state.mapHeight - 1 do
+    local line = {}
+    for x = 0, state.mapWidth - 1 do
+      table.insert(line, state.map[y][x] or " ")
+    end
+    table.insert(lines, table.concat(line))
+  end
+
+  return {
+    width = state.mapWidth,
+    height = state.mapHeight,
+    filename = state.filename,
+    lines = lines,
+  }
+end
+
+function Editor.setLayout(layout)
+  local lines = layout and layout.lines or {}
+  state.map = {}
+  state.mapHeight = math.max(1, #lines)
+  state.mapWidth = 1
+
+  for y, line in ipairs(lines) do
+    state.map[y - 1] = {}
+    state.mapWidth = math.max(state.mapWidth, #line)
+    for x = 1, #line do
+      state.map[y - 1][x - 1] = line:sub(x, x)
+    end
+  end
+
+  for y = 0, state.mapHeight - 1 do
+    state.map[y] = state.map[y] or {}
+    for x = 0, state.mapWidth - 1 do
+      if state.map[y][x] == nil then
+        state.map[y][x] = " "
+      end
+    end
+  end
+
+  if layout and layout.filename then
+    state.filename = layout.filename
+  end
+  Editor.saveToHistory()
+end
+
+function Editor.setPlaytestCallback(callback)
+  playtestCallback = callback
 end
 
 -- Set filename

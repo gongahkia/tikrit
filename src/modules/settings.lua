@@ -7,23 +7,20 @@ local FILE_NAME = "settings.txt"
 Settings.defaults = {
     audio = {
         master = 0.7,
-        music = 0.6,
-        sfx = 1.0,
+        music = 0.5,
+        sfx = 0.9,
     },
     gameplay = {
-        minimap = false,
         screenShake = true,
-        fog = true,
-        dailyChallenge = false,
-        timeAttack = false,
+        showHints = true,
     },
     accessibility = {
         colorblindMode = "none",
         highContrast = false,
         slowMode = false,
         fontScale = 1.0,
-        visualAudioIndicators = true,
-    }
+        visualAlerts = true,
+    },
 }
 
 Settings.data = Utils.deepCopy(Settings.defaults)
@@ -39,7 +36,7 @@ local function getFilesystem()
             end,
             exists = function(path)
                 return love.filesystem.getInfo(path) ~= nil
-            end
+            end,
         }
     end
 
@@ -69,7 +66,7 @@ local function getFilesystem()
                 return true
             end
             return false
-        end
+        end,
     }
 end
 
@@ -79,12 +76,7 @@ local function coerceValue(rawValue)
     elseif rawValue == "false" then
         return false
     end
-
-    local numeric = tonumber(rawValue)
-    if numeric ~= nil then
-        return numeric
-    end
-    return rawValue
+    return tonumber(rawValue) or rawValue
 end
 
 local function ensurePath(tbl, pathParts)
@@ -105,7 +97,6 @@ local function flatten(prefix, value, output)
         table.insert(output, prefix .. "=" .. tostring(value))
         return output
     end
-
     for key, innerValue in pairs(value) do
         local nextPrefix = prefix and (prefix .. "." .. key) or key
         flatten(nextPrefix, innerValue, output)
@@ -120,9 +111,8 @@ function Settings.resetDefaults()
 end
 
 function Settings.load()
-    local fs = getFilesystem()
     Settings.resetDefaults()
-
+    local fs = getFilesystem()
     if not fs.exists(FILE_NAME) then
         return Settings.data
     end
@@ -135,26 +125,24 @@ function Settings.load()
     for line in contents:gmatch("[^\r\n]+") do
         local path, rawValue = line:match("^([%w%.]+)=(.+)$")
         if path and rawValue then
-            local parts = Utils.split(path, ".")
-            local parent, leaf = ensurePath(Settings.data, parts)
+            if path == "accessibility.visualAudioIndicators" then
+                path = "accessibility.visualAlerts"
+            end
+            local parent, leaf = ensurePath(Settings.data, Utils.split(path, "."))
             parent[leaf] = coerceValue(rawValue)
         end
     end
-
     return Settings.data
 end
 
 function Settings.save()
-    local fs = getFilesystem()
-    local lines = flatten(nil, Settings.data, {})
-    return fs.write(FILE_NAME, table.concat(lines, "\n"))
+    return getFilesystem().write(FILE_NAME, table.concat(flatten(nil, Settings.data, {}), "\n"))
 end
 
 function Settings.get(path)
     if not path or path == "" then
         return Settings.data
     end
-
     local current = Settings.data
     for _, part in ipairs(Utils.split(path, ".")) do
         if type(current) ~= "table" then
@@ -169,8 +157,7 @@ function Settings.get(path)
 end
 
 function Settings.set(path, value)
-    local parts = Utils.split(path, ".")
-    local parent, leaf = ensurePath(Settings.data, parts)
+    local parent, leaf = ensurePath(Settings.data, Utils.split(path, "."))
     parent[leaf] = value
     return value
 end
